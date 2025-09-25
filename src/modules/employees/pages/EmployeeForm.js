@@ -68,7 +68,7 @@ const EmployeeForm = () => {
   });
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [loadingEmployee, setLoadingEmployee] = useState(isEdit);
+  const [loadingEmployee, setLoadingEmployee] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [error, setError] = useState('');
@@ -123,9 +123,17 @@ const EmployeeForm = () => {
     const loadEmployee = async () => {
       if (!isEdit) return;
 
+      let timeout;
+      
       try {
         setLoadingEmployee(true);
         console.log('Loading employee for edit, ID:', id);
+        
+        // Set timeout to prevent stuck loading
+        timeout = setTimeout(() => {
+          console.warn('Loading timeout, forcing state reset');
+          setLoadingEmployee(false);
+        }, 10000);
         
         const employee = await employeeService.getEmployeeById(id);
         console.log('Loaded employee data:', employee);
@@ -158,6 +166,9 @@ const EmployeeForm = () => {
         console.error('Error loading employee:', error);
         setError(error.message || 'Failed to load employee data');
       } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
         console.log('Setting loadingEmployee to false');
         setLoadingEmployee(false);
       }

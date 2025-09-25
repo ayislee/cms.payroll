@@ -312,13 +312,14 @@ const EmployeeList = () => {
               <CTable responsive hover>
                 <CTableHead>
                   <CTableRow>
+                    <CTableHeaderCell width="80">ID</CTableHeaderCell>
                     <CTableHeaderCell>NIK</CTableHeaderCell>
                     <CTableHeaderCell>Name</CTableHeaderCell>
                     <CTableHeaderCell>Email</CTableHeaderCell>
                     <CTableHeaderCell>Phone</CTableHeaderCell>
                     <CTableHeaderCell>Company</CTableHeaderCell>
                     <CTableHeaderCell>PTKP</CTableHeaderCell>
-                    <CTableHeaderCell>Hire Date</CTableHeaderCell>
+                    <CTableHeaderCell>Created</CTableHeaderCell>
                     <CTableHeaderCell width="120">Actions</CTableHeaderCell>
                   </CTableRow>
                 </CTableHead>
@@ -326,6 +327,11 @@ const EmployeeList = () => {
                   {employees.length > 0 ? (
                     employees.map((employee) => (
                       <CTableRow key={employee.employee_id}>
+                        <CTableDataCell>
+                          <CBadge color="primary" className="fs-6">
+                            #{employee.employee_id}
+                          </CBadge>
+                        </CTableDataCell>
                         <CTableDataCell>
                           <strong>{employee.nik}</strong>
                         </CTableDataCell>
@@ -383,7 +389,7 @@ const EmployeeList = () => {
                     ))
                   ) : (
                     <CTableRow>
-                      <CTableDataCell colSpan="8" className="text-center py-4">
+                      <CTableDataCell colSpan="9" className="text-center py-4">
                         <div className="text-medium-emphasis">
                           {searchTerm ? (
                             <>

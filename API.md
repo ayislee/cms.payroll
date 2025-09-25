@@ -432,39 +432,67 @@
 **Get payroll components**
 
 **Query Parameters:**
-- `page=1`, `limit=10`
-- `type=Earning/Deduction`
-- `is_active=1`
 
 **Response (Success - 200):**
 ```json
 {
-  "status": true,
-  "message": "Main components retrieved successfully",
-  "data": {
-    "main_components": {
-      "total": 10,
-      "perPage": 10,
-      "page": 1,
-      "lastPage": 1,
-      "data": [
+    "status": true,
+    "data": [
         {
-          "main_component_id": 1,
-          "name": "Basic Salary",
-          "code": "GP",
-          "type": "Earning",
-          "calculation_type": "fixed",
-          "attendance_based": false,
-          "is_active": true
-        }
-      ]
-    }
-  }
+            "main_component_id": 1,
+            "name": "Gaji Pokok",
+            "category": "Gaji",
+            "description": "Gaji pokok karyawan per bulan",
+            "code": "GP",
+            "type": "Earning",
+            "is_active": 1,
+            "is_integration": 0,
+            "integration_code": null,
+            "calculation_type": "manual",
+            "calculation_formula": null,
+            "calculation_params": null,
+            "attendance_based": 0,
+            "attendance_type": "full",
+            "created_at": "2025-09-24 14:56:13",
+            "updated_at": "2025-09-24 14:56:13"
+        },
+    ]
+}
+  
+```
+
+### **GET /api/v1/maincomponent/show**
+**Query Parameters:**
+```json
+{
+    "main_component_id": 11
 }
 ```
 
-### **GET /api/v1/maincomponent/{id}**
-**Get component by ID**
+**Response (Success - 200):**
+```json
+{
+    "status": true,
+    "data": {
+        "main_component_id": 1,
+        "name": "Gaji Pokok",
+        "category": "Gaji",
+        "description": "Gaji pokok karyawan per bulan",
+        "code": "GP",
+        "type": "Earning",
+        "is_active": 1,
+        "is_integration": 0,
+        "integration_code": null,
+        "calculation_type": "manual",
+        "calculation_formula": null,
+        "calculation_params": null,
+        "attendance_based": 0,
+        "attendance_type": "full",
+        "created_at": "2025-09-24 14:56:13",
+        "updated_at": "2025-09-24 14:56:13"
+    }
+}
+```
 
 ### **POST /api/v1/maincomponent**
 **Create new component**
@@ -472,24 +500,77 @@
 **Request:**
 ```json
 {
-  "name": "Overtime Allowance",
-  "code": "OT",
-  "type": "Earning",
-  "calculation_type": "auto",
-  "calculation_formula": "custom_calculation",
-  "calculation_params": {
-    "rate_per_hour": 50000,
-    "max_hours": 40
-  },
-  "attendance_based": false
+        "name": "BPJS Kesehatan (copy)",
+        "category": "Potongan",
+        "description": "Potongan BPJS Kesehatan 1% dari Gaji Pokok",
+        "code": "XXBPJS-K",
+        "type": "Deduction",
+        "is_active": "1",
+        "is_integration": "0",
+        "integration_code": null,
+        "calculation_type": "auto",
+        "calculation_formula": "bpjs_health_calculation",
+        "calculation_params": {"max_base": 12000000, "percentage": 0.01, "base_components": ["GP"]},
+        "attendance_based": "0",
+        "attendance_type": "full"
+}
+```
+**Response (Success - 200):**
+```json
+{
+    "status": true,
+    "message": "Main Component created successfully"
 }
 ```
 
-### **PUT /api/v1/maincomponent/{id}**
+### **PUT /api/v1/maincomponent/update**
 **Update component**
+**Query Parameters**
+```json
+{
+        "main_component_id": 13,
+        "name": "BPJS Kesehatan (copy)",
+        "category": "Potongan",
+        "description": "Potongan BPJS Kesehatan 1% dari Gaji Pokok",
+        "code": "XXBPJS-K",
+        "type": "Deduction",
+        "is_active": "1",
+        "is_integration": "0",
+        "integration_code": null,
+        "calculation_type": "auto",
+        "calculation_formula": "bpjs_health_calculation",
+        "calculation_params": {"max_base": 12000000, "percentage": 0.01, "base_components": ["GP"]},
+        "attendance_based": "0",
+        "attendance_type": "full"
+        
+}
+```
+**Response (Success - 200):**
+```json
+{
+    "status": true,
+    "message": "Main Component created successfully"
+}
+```
 
-### **DELETE /api/v1/maincomponent/{id}**
+
+
+### **DELETE /api/v1/maincomponent/**
 **Soft delete component**
+**Query Parameters**
+```json
+{
+        "main_component_id": 13
+        
+}
+```
+**Response (Success - 200):**
+```json
+{
+    "status": true,
+    "message": "Main Component Delete"
+}
+```
 
 ---
 

@@ -234,14 +234,14 @@ class EmployeeService {
   // Get PTKP label
   getPTKPLabel(ptkp) {
     const ptkpMap = {
-      'TK0': 'TK/0 - Tidak Kawin tanpa tanggungan',
-      'TK1': 'TK/1 - Tidak Kawin dengan 1 tanggungan',
-      'TK2': 'TK/2 - Tidak Kawin dengan 2 tanggungan',
-      'TK3': 'TK/3 - Tidak Kawin dengan 3 tanggungan',
-      'K0': 'K/0 - Kawin tanpa tanggungan',
-      'K1': 'K/1 - Kawin dengan 1 tanggungan',
-      'K2': 'K/2 - Kawin dengan 2 tanggungan',
-      'K3': 'K/3 - Kawin dengan 3 tanggungan'
+      'TK/0': 'TK/0 - Tidak Kawin tanpa tanggungan',
+      'TK/1': 'TK/1 - Tidak Kawin dengan 1 tanggungan',
+      'TK/2': 'TK/2 - Tidak Kawin dengan 2 tanggungan',
+      'TK/3': 'TK/3 - Tidak Kawin dengan 3 tanggungan',
+      'K/0': 'K/0 - Kawin tanpa tanggungan',
+      'K/1': 'K/1 - Kawin dengan 1 tanggungan',
+      'K/2': 'K/2 - Kawin dengan 2 tanggungan',
+      'K/3': 'K/3 - Kawin dengan 3 tanggungan'
     };
     return ptkpMap[ptkp] || ptkp;
   }

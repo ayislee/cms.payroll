@@ -29,22 +29,10 @@ const _nav = [
     name: 'Master Data'
   },
   {
-    component: CNavGroup,
+    component: CNavItem,
     name: 'Employee Management',
     to: '/employees',
-    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'Employee List',
-        to: '/employees'
-      },
-      {
-        component: CNavItem,
-        name: 'Add Employee',
-        to: '/employees/create'
-      }
-    ]
+    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />
   },
   {
     component: CNavGroup,
@@ -83,22 +71,10 @@ const _nav = [
     ]
   },
   {
-    component: CNavGroup,
+    component: CNavItem,
     name: 'Payroll Components',
     to: '/components',
-    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'Component List',
-        to: '/components'
-      },
-      {
-        component: CNavItem,
-        name: 'Add Component',
-        to: '/components/create'
-      }
-    ]
+    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />
   },
   {
     component: CNavTitle,

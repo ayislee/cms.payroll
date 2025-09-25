@@ -47,10 +47,10 @@ export const API_ENDPOINTS = {
   // Main Component Endpoints
   MAIN_COMPONENTS: {
     LIST: `${API_BASE}/maincomponent`,
-    DETAIL: (id) => `${API_BASE}/maincomponent/${id}`,
+    DETAIL: (id) => `${API_BASE}/maincomponent/show?main_component_id=${id}`,
     CREATE: `${API_BASE}/maincomponent`,
-    UPDATE: (id) => `${API_BASE}/maincomponent/${id}`,
-    DELETE: (id) => `${API_BASE}/maincomponent/${id}`
+    UPDATE: `${API_BASE}/maincomponent/update`,
+    DELETE: `${API_BASE}/maincomponent/`
   },
 
   // Payroll Management Endpoints

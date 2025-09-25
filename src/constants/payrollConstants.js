@@ -15,14 +15,14 @@ export const CALCULATION_TYPES = {
 };
 
 export const PTKP_OPTIONS = [
-  { value: 'TK0', label: 'TK/0 - Tidak Kawin tanpa tanggungan' },
-  { value: 'TK1', label: 'TK/1 - Tidak Kawin dengan 1 tanggungan' },
-  { value: 'TK2', label: 'TK/2 - Tidak Kawin dengan 2 tanggungan' },
-  { value: 'TK3', label: 'TK/3 - Tidak Kawin dengan 3 tanggungan' },
-  { value: 'K0', label: 'K/0 - Kawin tanpa tanggungan' },
-  { value: 'K1', label: 'K/1 - Kawin dengan 1 tanggungan' },
-  { value: 'K2', label: 'K/2 - Kawin dengan 2 tanggungan' },
-  { value: 'K3', label: 'K/3 - Kawin dengan 3 tanggungan' }
+  { value: 'TK/0', label: 'TK/0 - Tidak Kawin tanpa tanggungan' },
+  { value: 'TK/1', label: 'TK/1 - Tidak Kawin dengan 1 tanggungan' },
+  { value: 'TK/2', label: 'TK/2 - Tidak Kawin dengan 2 tanggungan' },
+  { value: 'TK/3', label: 'TK/3 - Tidak Kawin dengan 3 tanggungan' },
+  { value: 'K/0', label: 'K/0 - Kawin tanpa tanggungan' },
+  { value: 'K/1', label: 'K/1 - Kawin dengan 1 tanggungan' },
+  { value: 'K/2', label: 'K/2 - Kawin dengan 2 tanggungan' },
+  { value: 'K/3', label: 'K/3 - Kawin dengan 3 tanggungan' }
 ];
 
 export const PAYROLL_STATUS = {

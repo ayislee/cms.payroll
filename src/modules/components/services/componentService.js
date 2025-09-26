@@ -40,6 +40,26 @@ class ComponentService {
   async getComponentById(id) {
     try {
       const response = await apiClient.get(API_ENDPOINTS.MAIN_COMPONENTS.DETAIL(id));
+
+      // Ensure calculation_params is parsed as object if it's a JSON string
+      if (response.data && response.data.calculation_params) {
+        console.log('ComponentDetail - Raw calculation_params from API:', response.data.calculation_params);
+        console.log('ComponentDetail - Type of calculation_params:', typeof response.data.calculation_params);
+
+        if (typeof response.data.calculation_params === 'string') {
+          try {
+            response.data.calculation_params = JSON.parse(response.data.calculation_params);
+            console.log('ComponentDetail - Successfully parsed calculation_params to object:', response.data.calculation_params);
+          } catch (error) {
+            console.warn('ComponentDetail - Failed to parse calculation_params from API:', response.data.calculation_params);
+            console.warn('ComponentDetail - Parse error:', error.message);
+            // Keep as string if parsing fails
+          }
+        } else {
+          console.log('ComponentDetail - calculation_params is already an object:', response.data.calculation_params);
+        }
+      }
+
       return response.data || null;
     } catch (error) {
       // Fallback to mock data for demo
@@ -61,43 +81,27 @@ class ComponentService {
     }
   }
 
-  // Update component using query parameters
+  // Update component using request body
   async updateComponent(id, componentData) {
     try {
-      const queryParams = new URLSearchParams();
-      
-      // Add all component data as query parameters
-      Object.keys(componentData).forEach(key => {
-        if (componentData[key] !== null && componentData[key] !== undefined) {
-          if (typeof componentData[key] === 'object') {
-            queryParams.append(key, JSON.stringify(componentData[key]));
-          } else {
-            queryParams.append(key, componentData[key]);
-          }
-        }
-      });
-      
-      // Add main_component_id
-      queryParams.append('main_component_id', id);
-      
-      const url = `${API_ENDPOINTS.MAIN_COMPONENTS.UPDATE}?${queryParams.toString()}`;
-      const response = await apiClient.put(url);
-      
+      // Include main_component_id in the request body as per API.md
+      const requestData = {
+        main_component_id: parseInt(id),
+        ...componentData
+      };
+
+      const response = await apiClient.put(API_ENDPOINTS.MAIN_COMPONENTS.UPDATE, requestData);
+
       return response.data || response;
     } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  // Delete component using query parameters
+  // Delete component using path parameter (consistent with other modules)
   async deleteComponent(id) {
     try {
-      const queryParams = new URLSearchParams();
-      queryParams.append('main_component_id', id);
-      
-      const url = `${API_ENDPOINTS.MAIN_COMPONENTS.DELETE}?${queryParams.toString()}`;
-      const response = await apiClient.delete(url);
-      
+      const response = await apiClient.delete(API_ENDPOINTS.MAIN_COMPONENTS.DELETE(id));
       return response.data || response;
     } catch (error) {
       throw this.handleError(error);

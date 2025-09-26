@@ -35,6 +35,29 @@ import { formatDate, formatDateTime } from '../../../utils/formatters';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import componentService from '../services/componentService';
 
+// Helper function to ensure calculation_params is always an object
+const parseCalculationParams = (params) => {
+  if (!params) return null;
+
+  // If it's already an object, return as is
+  if (typeof params === 'object' && params !== null) {
+    return params;
+  }
+
+  // If it's a string, try to parse as JSON
+  if (typeof params === 'string') {
+    try {
+      return JSON.parse(params);
+    } catch (error) {
+      console.warn('Failed to parse calculation_params as JSON:', params);
+      return params; // Return as string if parsing fails
+    }
+  }
+
+  // Return as is for other types
+  return params;
+};
+
 const ComponentDetail = () => {
   const { id } = useParams();
   const { hasPermission } = useAuth();
@@ -50,9 +73,20 @@ const ComponentDetail = () => {
       try {
         setLoading(true);
         const componentData = await componentService.getComponentById(id);
-        
+
         if (componentData) {
-          setComponent(componentData);
+          // Parse calculation_params to ensure it's always an object
+          const processedData = {
+            ...componentData,
+            calculation_params: parseCalculationParams(componentData.calculation_params)
+          };
+
+          // Debug logging untuk memastikan parsing berhasil
+          console.log('ComponentDetail - Processed component data:', processedData);
+          console.log('ComponentDetail - calculation_params type after processing:', typeof processedData.calculation_params);
+          console.log('ComponentDetail - calculation_params value:', processedData.calculation_params);
+
+          setComponent(processedData);
         } else {
           setError('Component not found');
         }
@@ -211,8 +245,11 @@ const ComponentDetail = () => {
                           <CListGroupItem>
                             <strong>Parameters</strong>
                             <div className="mt-1">
-                              <pre className="small bg-light p-2 rounded">
-                                {JSON.stringify(component.calculation_params, null, 2)}
+                              <pre className="small bg-light p-2 rounded" style={{fontSize: '12px'}}>
+                                {typeof component.calculation_params === 'object'
+                                  ? JSON.stringify(component.calculation_params, null, 2)
+                                  : component.calculation_params
+                                }
                               </pre>
                             </div>
                           </CListGroupItem>

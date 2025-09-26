@@ -54,25 +54,11 @@ const payrollNavigation = [
     ]
   },
   {
-    component: 'CNavGroup',
+    component: 'CNavItem',
     name: 'Company Management',
     to: '/companies',
     icon: <CIcon icon={cilBuilding} customClassName="nav-icon" />,
-    requiredPermissions: [PERMISSIONS.COMPANIES_VIEW],
-    items: [
-      {
-        component: 'CNavItem',
-        name: 'Company List',
-        to: '/companies',
-        requiredPermissions: [PERMISSIONS.COMPANIES_VIEW]
-      },
-      {
-        component: 'CNavItem',
-        name: 'Add Company',
-        to: '/companies/create',
-        requiredPermissions: [PERMISSIONS.COMPANIES_CREATE]
-      }
-    ]
+    requiredPermissions: [PERMISSIONS.COMPANIES_VIEW]
   },
   {
     component: 'CNavGroup',

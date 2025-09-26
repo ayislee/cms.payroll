@@ -44,7 +44,6 @@ import {
   cilTrash,
   cilMagnifyingGlass,
   cilReload,
-  cilEyedropper,
   cilInfo
 } from '@coreui/icons';
 import { useAuth } from '../../../hooks/useAuth';
@@ -54,6 +53,75 @@ import { PERMISSIONS } from '../../../constants/userRoles';
 import { PTKP_OPTIONS } from '../../../constants/payrollConstants';
 import employeeService from '../services/employeeService';
 import config from '../../../config/environment';
+
+// Enhanced Search Styles
+const searchStyles = `
+  .search-container {
+    position: relative;
+  }
+
+  .search-history-container {
+    position: relative;
+  }
+
+  .hover-bg-light:hover {
+    background-color: #f8f9fa !important;
+  }
+
+  .cursor-pointer {
+    cursor: pointer;
+  }
+
+  .z-index-1000 {
+    z-index: 1000;
+  }
+
+  .search-suggestions {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .search-suggestion-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f1f3f4;
+    transition: background-color 0.15s ease-in-out;
+  }
+
+  .search-suggestion-item:hover {
+    background-color: #f8f9fa;
+  }
+
+  .search-suggestion-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 0.5rem;
+    color: #6c757d;
+  }
+
+  .search-suggestion-badge {
+    font-size: 0.7rem;
+  }
+
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
+// Inject styles
+if (!document.getElementById('employee-search-styles')) {
+  const styleElement = document.createElement('style');
+  styleElement.id = 'employee-search-styles';
+  styleElement.textContent = searchStyles;
+  document.head.appendChild(styleElement);
+}
 
 const EmployeeList = () => {
   const navigate = useNavigate();
@@ -67,6 +135,11 @@ const EmployeeList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchHistory, setSearchHistory] = useState([]);
+  const [showSearchHistory, setShowSearchHistory] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
@@ -76,9 +149,12 @@ const EmployeeList = () => {
   const [deleting, setDeleting] = useState(false);
 
   // Load employees data
-  const loadEmployees = useCallback(async (page = 1, search = '') => {
+  const loadEmployees = useCallback(async (page = 1, search = '', showSearchIndicator = true) => {
     try {
-      setLoading(true);
+      if (showSearchIndicator) {
+        setLoading(true);
+        setIsSearching(search.trim() !== '');
+      }
       setError('');
 
       const params = {
@@ -88,18 +164,19 @@ const EmployeeList = () => {
       };
 
       const response = await employeeService.getEmployees(params);
-      
+
       setEmployees(response.data || []);
       setTotalEmployees(response.total || 0);
       setTotalPages(response.lastPage || Math.ceil((response.total || 0) / rows));
       setCurrentPage(response.page || page);
-      
+
     } catch (error) {
       console.error('Error loading employees:', error);
       setError(error.message || 'Failed to load employees');
       setEmployees([]);
     } finally {
       setLoading(false);
+      setIsSearching(false);
     }
   }, [rows]);
 
@@ -108,18 +185,110 @@ const EmployeeList = () => {
     loadEmployees(1, searchTerm);
   }, [loadEmployees, searchTerm]);
 
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showSuggestions && !event.target.closest('.search-container')) {
+        setShowSuggestions(false);
+      }
+      if (showSearchHistory && !event.target.closest('.search-history-container')) {
+        setShowSearchHistory(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSuggestions, showSearchHistory]);
+
   // Handle search
   const handleSearch = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
     setCurrentPage(1);
-    
+
+    // Show suggestions
+    setShowSuggestions(true);
+    generateSuggestions(value);
+
+    // Add to search history if not empty and not already in history
+    if (value.trim() && !searchHistory.includes(value.trim())) {
+      setSearchHistory(prev => [value.trim(), ...prev.slice(0, 9)]); // Keep only last 10 searches
+    }
+
     // Debounce search
     const timeoutId = setTimeout(() => {
+      setShowSuggestions(false);
       loadEmployees(1, value);
     }, 500);
 
     return () => clearTimeout(timeoutId);
+  };
+
+  // Handle search from history
+  const handleSearchFromHistory = (searchValue) => {
+    setSearchTerm(searchValue);
+    setCurrentPage(1);
+    setShowSearchHistory(false);
+    loadEmployees(1, searchValue);
+  };
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setCurrentPage(1);
+    loadEmployees(1, '');
+  };
+
+  // Clear search history
+  const clearSearchHistory = () => {
+    setSearchHistory([]);
+  };
+
+  // Generate search suggestions
+  const generateSuggestions = useCallback((searchValue) => {
+    if (!searchValue || searchValue.length < 2) {
+      setSearchSuggestions([]);
+      return;
+    }
+
+    const suggestions = [
+      // Search in current employees
+      ...employees
+        .filter(emp =>
+          emp.name?.toLowerCase().includes(searchValue.toLowerCase()) ||
+          emp.nik?.toLowerCase().includes(searchValue.toLowerCase()) ||
+          emp.email?.toLowerCase().includes(searchValue.toLowerCase())
+        )
+        .slice(0, 5)
+        .map(emp => ({
+          type: 'employee',
+          value: emp.name,
+          subtitle: `${emp.nik} - ${emp.email}`,
+          icon: cilPeople
+        })),
+
+      // Common search patterns
+      ...(searchValue.length >= 3 ? [
+        {
+          type: 'pattern',
+          value: searchValue,
+          subtitle: 'Search all fields',
+          icon: cilMagnifyingGlass
+        }
+      ] : [])
+    ];
+
+    setSearchSuggestions(suggestions.slice(0, 8)); // Max 8 suggestions
+  }, [employees]);
+
+  // Handle suggestion click
+  const handleSuggestionClick = (suggestion) => {
+    setSearchTerm(suggestion.value);
+    setCurrentPage(1);
+    setShowSuggestions(false);
+    loadEmployees(1, suggestion.value);
   };
 
   // Handle page change
@@ -236,16 +405,93 @@ const EmployeeList = () => {
               {/* Search and Actions */}
               <CRow className="mb-3">
                 <CCol md={6}>
-                  <CInputGroup>
+                  <div className="search-container">
+                    <CInputGroup>
                     <CFormInput
                       placeholder="Search by name, NIK, or email..."
                       value={searchTerm}
                       onChange={handleSearch}
                     />
-                    <CButton color="outline-secondary" variant="outline">
-                      <CIcon icon={cilMagnifyingGlass} />
-                    </CButton>
+                    <div className="search-history-container">
+                      <CDropdown visible={showSearchHistory} onToggle={setShowSearchHistory}>
+                        <CDropdownToggle color="outline-secondary" variant="outline">
+                          <CIcon icon={cilMagnifyingGlass} />
+                        </CDropdownToggle>
+                      <CDropdownMenu className="w-100">
+                        {searchHistory.length > 0 ? (
+                          <>
+                            {searchHistory.map((search, index) => (
+                              <CDropdownItem
+                                key={index}
+                                onClick={() => handleSearchFromHistory(search)}
+                                className="d-flex justify-content-between align-items-center"
+                              >
+                                <span>
+                                  <CIcon icon={cilMagnifyingGlass} className="me-2" />
+                                  {search}
+                                </span>
+                                <small className="text-muted">Recent</small>
+                              </CDropdownItem>
+                            ))}
+                            <CDropdownItem
+                              onClick={clearSearchHistory}
+                              className="text-danger"
+                            >
+                              <CIcon icon={cilTrash} className="me-2" />
+                              Clear History
+                            </CDropdownItem>
+                          </>
+                        ) : (
+                          <CDropdownItem disabled>
+                            No recent searches
+                          </CDropdownItem>
+                        )}
+                      </CDropdownMenu>
+                    </CDropdown>
+                    </div>
+                    {searchTerm && (
+                      <CButton color="outline-danger" variant="outline" onClick={handleClearSearch}>
+                        <CIcon icon={cilTrash} />
+                      </CButton>
+                    )}
                   </CInputGroup>
+                  {/* Search Suggestions */}
+                  {showSuggestions && searchSuggestions.length > 0 && (
+                    <div className="position-relative">
+                      <div className="search-suggestions position-absolute w-100">
+                        {searchSuggestions.map((suggestion, index) => (
+                          <div
+                            key={index}
+                            className="search-suggestion-item cursor-pointer"
+                            onClick={() => handleSuggestionClick(suggestion)}
+                          >
+                            <div className="d-flex align-items-center">
+                              <CIcon icon={suggestion.icon} className="search-suggestion-icon" />
+                              <div className="flex-grow-1">
+                                <div className="fw-bold">{suggestion.value}</div>
+                                <small className="text-muted">{suggestion.subtitle}</small>
+                              </div>
+                              <CBadge
+                                color={suggestion.type === 'employee' ? 'info' : 'secondary'}
+                                size="sm"
+                                className="search-suggestion-badge"
+                              >
+                                {suggestion.type}
+                              </CBadge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {isSearching && (
+                    <small className="text-info mt-1 d-block">
+                      <CSpinner size="sm" className="me-2" />
+                      Searching...
+                    </small>
+                  )}
+                  </div>
                 </CCol>
                 <CCol md={6} className="d-flex justify-content-end gap-2">
                   <div className="d-flex align-items-center">
@@ -393,26 +639,45 @@ const EmployeeList = () => {
                         <div className="text-medium-emphasis">
                           {searchTerm ? (
                             <>
+                              <CIcon icon={cilMagnifyingGlass} className="me-2" size="xl" />
+                              <br />
                               No employees found for "{searchTerm}"
                               <br />
-                              <CButton
-                                color="link"
-                                size="sm"
-                                onClick={() => setSearchTerm('')}
-                              >
-                                Clear search
-                              </CButton>
+                              <small className="d-block mt-2">
+                                Try searching with different keywords or check your spelling
+                              </small>
+                              <div className="mt-3">
+                                <CButton
+                                  color="link"
+                                  size="sm"
+                                  onClick={() => setSearchTerm('')}
+                                  className="me-3"
+                                >
+                                  Clear search
+                                </CButton>
+                                <small className="text-muted">
+                                  or try: {searchSuggestions.slice(0, 3).map(s => s.value).join(', ')}
+                                </small>
+                              </div>
                             </>
                           ) : (
                             <>
+                              <CIcon icon={cilPeople} className="me-2" size="xl" />
+                              <br />
                               No employees found
                               <br />
+                              <small className="d-block mt-2">
+                                Start by adding your first employee to the system
+                              </small>
                               {hasPermission(PERMISSIONS.EMPLOYEES_CREATE) && (
-                                <Link to="/employees/create">
-                                  <CButton color="primary" size="sm" className="mt-2">
-                                    Add First Employee
-                                  </CButton>
-                                </Link>
+                                <div className="mt-3">
+                                  <Link to="/employees/create">
+                                    <CButton color="primary" size="sm">
+                                      <CIcon icon={cilPlus} className="me-2" />
+                                      Add First Employee
+                                    </CButton>
+                                  </Link>
+                                </div>
                               )}
                             </>
                           )}

@@ -445,13 +445,13 @@
             "description": "Gaji pokok karyawan per bulan",
             "code": "GP",
             "type": "Earning",
-            "is_active": 1,
-            "is_integration": 0,
+            "is_active": "1",
+            "is_integration": "0",
             "integration_code": null,
             "calculation_type": "manual",
             "calculation_formula": null,
             "calculation_params": null,
-            "attendance_based": 0,
+            "attendance_based": "0",
             "attendance_type": "full",
             "created_at": "2025-09-24 14:56:13",
             "updated_at": "2025-09-24 14:56:13"
@@ -504,15 +504,15 @@
         "category": "Potongan",
         "description": "Potongan BPJS Kesehatan 1% dari Gaji Pokok",
         "code": "XXBPJS-K",
-        "type": "Deduction",
-        "is_active": "1",
-        "is_integration": "0",
+        "type": "Deduction", // "required|in:Earning,Deduction",
+        "is_active": "1", // "required|in:0,1",
+        "is_integration": "0", "required|in:0,1",
         "integration_code": null,
-        "calculation_type": "auto",
+        "calculation_type": "auto", "required|in:manual,auto",
         "calculation_formula": "bpjs_health_calculation",
         "calculation_params": {"max_base": 12000000, "percentage": 0.01, "base_components": ["GP"]},
-        "attendance_based": "0",
-        "attendance_type": "full"
+        "attendance_based": "0", // "required|in:0,1",
+        "attendance_type": "full" // "required|in:full,prorate"
 }
 ```
 **Response (Success - 200):**
@@ -533,15 +533,15 @@
         "category": "Potongan",
         "description": "Potongan BPJS Kesehatan 1% dari Gaji Pokok",
         "code": "XXBPJS-K",
-        "type": "Deduction",
-        "is_active": "1",
-        "is_integration": "0",
+        "type": "Deduction", // "required|in:Earning,Deduction",
+        "is_active": "1", // "required|in:0,1",
+        "is_integration": "0", "required|in:0,1",
         "integration_code": null,
-        "calculation_type": "auto",
+        "calculation_type": "auto", "required|in:manual,auto",
         "calculation_formula": "bpjs_health_calculation",
         "calculation_params": {"max_base": 12000000, "percentage": 0.01, "base_components": ["GP"]},
-        "attendance_based": "0",
-        "attendance_type": "full"
+        "attendance_based": "0", // "required|in:0,1",
+        "attendance_type": "full" // "required|in:full,prorate"
         
 }
 ```

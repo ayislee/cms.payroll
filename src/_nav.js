@@ -35,22 +35,10 @@ const _nav = [
     icon: <CIcon icon={cilPeople} customClassName="nav-icon" />
   },
   {
-    component: CNavGroup,
+    component: CNavItem,
     name: 'Company Management',
     to: '/companies',
-    icon: <CIcon icon={cilBuilding} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'Company List',
-        to: '/companies'
-      },
-      {
-        component: CNavItem,
-        name: 'Add Company',
-        to: '/companies/create'
-      }
-    ]
+    icon: <CIcon icon={cilBuilding} customClassName="nav-icon" />
   },
   {
     component: CNavGroup,

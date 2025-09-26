@@ -25,7 +25,6 @@ export const getPageTitle = (pathname) => {
     '/employees': 'Employee Management',
     '/employees/create': 'Add Employee',
     '/companies': 'Company Management',
-    '/companies/create': 'Add Company',
     '/users': 'User Management',
     '/users/create': 'Add User',
     '/components': 'Payroll Components',

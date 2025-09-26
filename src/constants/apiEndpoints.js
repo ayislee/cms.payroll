@@ -38,10 +38,13 @@ export const API_ENDPOINTS = {
   // Company Management Endpoints
   COMPANIES: {
     LIST: `${API_BASE}/company`,
-    DETAIL: (id) => `${API_BASE}/company/${id}`,
+    DETAIL: (id) => `${API_BASE}/company/show?company_id=${id}`,
     CREATE: `${API_BASE}/company`,
-    UPDATE: (id) => `${API_BASE}/company/${id}`,
-    DELETE: (id) => `${API_BASE}/company/${id}`
+    UPDATE: `${API_BASE}/company`,
+    DELETE: (id) => `${API_BASE}/company?company_id=${id}`,
+    TOGGLE_STATUS: (id) => `${API_BASE}/company/toggle-status?company_id=${id}`,
+    STATS: (id) => `${API_BASE}/company/stats?company_id=${id}`,
+    BULK_CREATE: `${API_BASE}/company/bulk-create`
   },
 
   // Main Component Endpoints
@@ -50,7 +53,7 @@ export const API_ENDPOINTS = {
     DETAIL: (id) => `${API_BASE}/maincomponent/show?main_component_id=${id}`,
     CREATE: `${API_BASE}/maincomponent`,
     UPDATE: `${API_BASE}/maincomponent/update`,
-    DELETE: `${API_BASE}/maincomponent/`
+    DELETE: (id) => `${API_BASE}/maincomponent/${id}`
   },
 
   // Payroll Management Endpoints

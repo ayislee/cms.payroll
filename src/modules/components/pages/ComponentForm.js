@@ -15,7 +15,6 @@ import {
   CFormInput,
   CFormSelect,
   CFormTextarea,
-  CFormCheck,
   CButton,
   CSpinner,
   CAlert,
@@ -34,6 +33,7 @@ const ComponentForm = () => {
   const { id } = useParams();
   const { hasPermission } = useAuth();
   const isEdit = Boolean(id);
+
 
   useDocumentTitle(isEdit ? 'Edit Component' : 'Add Component');
 

@@ -93,12 +93,6 @@ const payrollRoutes = [
     requiredPermissions: [PERMISSIONS.COMPANIES_VIEW]
   },
   {
-    path: '/companies/create',
-    name: 'Create Company',
-    element: CompanyForm,
-    requiredPermissions: [PERMISSIONS.COMPANIES_CREATE]
-  },
-  {
     path: '/companies/:id',
     name: 'Company Detail',
     element: CompanyDetail,

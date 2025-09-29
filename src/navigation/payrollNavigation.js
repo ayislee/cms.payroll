@@ -61,26 +61,12 @@ const payrollNavigation = [
     requiredPermissions: [PERMISSIONS.COMPANIES_VIEW]
   },
   {
-    component: 'CNavGroup',
+    component: 'CNavItem',
     name: 'User Management',
     to: '/users',
     icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
     requiredPermissions: [PERMISSIONS.USERS_VIEW],
-    requiredRoles: [USER_ROLES.ADMIN],
-    items: [
-      {
-        component: 'CNavItem',
-        name: 'User List',
-        to: '/users',
-        requiredPermissions: [PERMISSIONS.USERS_VIEW]
-      },
-      {
-        component: 'CNavItem',
-        name: 'Add User',
-        to: '/users/create',
-        requiredPermissions: [PERMISSIONS.USERS_CREATE]
-      }
-    ]
+    requiredRoles: [USER_ROLES.ADMIN]
   },
   {
     component: 'CNavGroup',

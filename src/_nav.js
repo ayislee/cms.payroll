@@ -41,22 +41,10 @@ const _nav = [
     icon: <CIcon icon={cilBuilding} customClassName="nav-icon" />
   },
   {
-    component: CNavGroup,
+    component: CNavItem,
     name: 'User Management',
     to: '/users',
-    icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'User List',
-        to: '/users'
-      },
-      {
-        component: CNavItem,
-        name: 'Add User',
-        to: '/users/create'
-      }
-    ]
+    icon: <CIcon icon={cilUser} customClassName="nav-icon" />
   },
   {
     component: CNavItem,

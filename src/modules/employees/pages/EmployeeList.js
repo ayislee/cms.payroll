@@ -44,7 +44,8 @@ import {
   cilTrash,
   cilMagnifyingGlass,
   cilReload,
-  cilInfo
+  cilInfo,
+  cilSettings
 } from '@coreui/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
@@ -566,7 +567,7 @@ const EmployeeList = () => {
                     <CTableHeaderCell>Company</CTableHeaderCell>
                     <CTableHeaderCell>PTKP</CTableHeaderCell>
                     <CTableHeaderCell>Created</CTableHeaderCell>
-                    <CTableHeaderCell width="120">Actions</CTableHeaderCell>
+                    <CTableHeaderCell width="150">Actions</CTableHeaderCell>
                   </CTableRow>
                 </CTableHead>
                 <CTableBody>
@@ -619,6 +620,11 @@ const EmployeeList = () => {
                                 </CButton>
                               </Link>
                             )}
+                            <Link to={`/employees/${employee.employee_id}/settings`}>
+                              <CButton color="secondary" variant="outline" size="sm" title="Employee Settings">
+                                <CIcon icon={cilSettings} />
+                              </CButton>
+                            </Link>
                             {hasPermission(PERMISSIONS.EMPLOYEES_DELETE) && (
                               <CButton
                                 color="danger"
@@ -635,7 +641,7 @@ const EmployeeList = () => {
                     ))
                   ) : (
                     <CTableRow>
-                      <CTableDataCell colSpan="9" className="text-center py-4">
+                      <CTableDataCell colSpan="10" className="text-center py-4">
                         <div className="text-medium-emphasis">
                           {searchTerm ? (
                             <>

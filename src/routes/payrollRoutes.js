@@ -83,6 +83,12 @@ const payrollRoutes = [
     element: EmployeeForm,
     requiredPermissions: [PERMISSIONS.EMPLOYEES_UPDATE]
   },
+  {
+    path: '/employees/:id/settings',
+    name: 'Employee Settings',
+    element: EmployeeDetail,
+    requiredPermissions: [PERMISSIONS.EMPLOYEES_VIEW]
+  },
 
   // Company Management Routes
   {
@@ -112,12 +118,6 @@ const payrollRoutes = [
     element: UserList,
     exact: true,
     requiredPermissions: [PERMISSIONS.USERS_VIEW]
-  },
-  {
-    path: '/users/create',
-    name: 'Create User',
-    element: UserForm,
-    requiredPermissions: [PERMISSIONS.USERS_CREATE]
   },
   {
     path: '/users/:id',

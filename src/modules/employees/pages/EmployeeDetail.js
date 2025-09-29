@@ -23,13 +23,19 @@ import {
   CModalHeader,
   CModalTitle,
   CModalBody,
-  CModalFooter
+  CModalFooter,
+  CTabs,
+  CTab,
+  CTabList,
+  CTabContent,
+  CTabPanel
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import {
   cilUser,
   cilPencil,
   cilTrash,
+  cilSettings,
   cilArrowLeft,
   cilBuilding,
   cilPhone,
@@ -58,6 +64,7 @@ const EmployeeDetail = () => {
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
 
   // Set document title
   useDocumentTitle(employee ? `${employee.name} - Employee Detail` : 'Employee Detail');
@@ -223,8 +230,19 @@ const EmployeeDetail = () => {
             </CCardHeader>
 
             <CCardBody>
-              <CRow>
-                {/* Basic Information */}
+              <CTabs activeItemKey={activeTab} onActiveItemChange={(key) => setActiveTab(key)}>
+                <CTabList variant="tabs">
+                  <CTab itemKey="details">Details</CTab>
+                  <CTab itemKey="settings">
+                    <CIcon icon={cilSettings} className="me-1" />
+                    Settings
+                  </CTab>
+                </CTabList>
+
+                <CTabContent>
+                  <CTabPanel className="mt-3" itemKey="details">
+                    <CRow>
+                      {/* Basic Information */}
                 <CCol lg={6}>
                   <CCard className="h-100">
                     <CCardHeader>
@@ -531,6 +549,50 @@ const EmployeeDetail = () => {
                   </CCard>
                 </CCol>
               </CRow>
+
+                  </CTabPanel>
+
+                  <CTabPanel className="mt-3" itemKey="settings">
+                    <CRow>
+                      <CCol xs={12}>
+                        <CCard className="mb-4">
+                          <CCardHeader>
+                            <h5 className="mb-0">
+                              <CIcon icon={cilSettings} className="me-2" />
+                              Employee Settings
+                            </h5>
+                          </CCardHeader>
+                          <CCardBody>
+                            <CAlert color="info">
+                              <CIcon icon={cilInfo} className="me-2" />
+                              <strong>Employee Settings</strong>
+                              <br />
+                              <small>
+                                Configure employee-specific settings and preferences.
+                                This section allows you to manage various employee configurations.
+                              </small>
+                            </CAlert>
+
+                            <div className="text-center text-muted py-4">
+                              <CIcon icon={cilSettings} size="xl" className="mb-3" />
+                              <p>Employee settings functionality will be implemented here.</p>
+                              <small>
+                                This section can include settings like:
+                                <ul className="list-unstyled mt-2">
+                                  <li>• Notification preferences</li>
+                                  <li>• Payroll calculation preferences</li>
+                                  <li>• Leave management settings</li>
+                                  <li>• Integration settings</li>
+                                </ul>
+                              </small>
+                            </div>
+                          </CCardBody>
+                        </CCard>
+                      </CCol>
+                    </CRow>
+                  </CTabPanel>
+                </CTabContent>
+              </CTabs>
 
               {/* Additional Actions */}
               <CRow className="mt-4">

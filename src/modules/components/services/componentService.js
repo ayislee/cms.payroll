@@ -43,20 +43,16 @@ class ComponentService {
 
       // Ensure calculation_params is parsed as object if it's a JSON string
       if (response.data && response.data.calculation_params) {
-        console.log('ComponentDetail - Raw calculation_params from API:', response.data.calculation_params);
-        console.log('ComponentDetail - Type of calculation_params:', typeof response.data.calculation_params);
 
         if (typeof response.data.calculation_params === 'string') {
           try {
             response.data.calculation_params = JSON.parse(response.data.calculation_params);
-            console.log('ComponentDetail - Successfully parsed calculation_params to object:', response.data.calculation_params);
           } catch (error) {
             console.warn('ComponentDetail - Failed to parse calculation_params from API:', response.data.calculation_params);
             console.warn('ComponentDetail - Parse error:', error.message);
             // Keep as string if parsing fails
           }
         } else {
-          console.log('ComponentDetail - calculation_params is already an object:', response.data.calculation_params);
         }
       }
 

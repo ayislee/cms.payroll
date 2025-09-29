@@ -127,7 +127,6 @@ const EmployeeForm = () => {
       
       try {
         setLoadingEmployee(true);
-        console.log('Loading employee for edit, ID:', id);
         
         // Set timeout to prevent stuck loading
         timeout = setTimeout(() => {
@@ -136,7 +135,6 @@ const EmployeeForm = () => {
         }, 10000);
         
         const employee = await employeeService.getEmployeeById(id);
-        console.log('Loaded employee data:', employee);
         
         if (employee) {
           setFormData({
@@ -169,7 +167,6 @@ const EmployeeForm = () => {
         if (timeout) {
           clearTimeout(timeout);
         }
-        console.log('Setting loadingEmployee to false');
         setLoadingEmployee(false);
       }
     };

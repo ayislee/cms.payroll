@@ -57,27 +57,10 @@ const _nav = [
     name: 'Payroll Operations'
   },
   {
-    component: CNavGroup,
+    component: CNavItem,
     name: 'Payroll Management',
     to: '/payroll',
-    icon: <CIcon icon={cilCash} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'Payroll List',
-        to: '/payroll'
-      },
-      {
-        component: CNavItem,
-        name: 'Generate Payroll',
-        to: '/payroll/generate'
-      },
-      {
-        component: CNavItem,
-        name: 'Mass Generate',
-        to: '/payroll/mass-generate'
-      }
-    ]
+    icon: <CIcon icon={cilCash} customClassName="nav-icon" />
   },
   {
     component: CNavGroup,

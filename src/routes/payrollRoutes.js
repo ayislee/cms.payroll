@@ -29,7 +29,9 @@ const ComponentDetail = React.lazy(() => import('../modules/components/pages/Com
 const ComponentForm = React.lazy(() => import('../modules/components/pages/ComponentForm'));
 
 // Payroll Management
-const PayrollList = React.lazy(() => import('../modules/payroll/pages/PayrollList'));
+const PayrollList = React.lazy(() => {
+  return import('../modules/payroll/pages/PayrollList');
+});
 const PayrollDetail = React.lazy(() => import('../modules/payroll/pages/PayrollDetail'));
 const PayrollGenerate = React.lazy(() => import('../modules/payroll/pages/PayrollGenerate'));
 const PayrollMassGenerate = React.lazy(() => import('../modules/payroll/pages/PayrollMassGenerate'));

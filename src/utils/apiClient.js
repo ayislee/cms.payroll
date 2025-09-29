@@ -45,8 +45,12 @@ class ApiClient {
       timeout = this.timeout
     } = options;
 
-    console.log('=== API CLIENT REQUEST DEBUG ===');
-    console.log('API Request details:', { url, method, headers, body, isExternal, timeout });
+    
+    // Parse URL to see query parameters
+    try {
+      const urlObj = new URL(url);
+    } catch (e) {
+    }
     
     // Validate URL
     if (!url) {
@@ -69,14 +73,14 @@ class ApiClient {
       body: body ? JSON.stringify(body) : null
     };
 
-    console.log('Final request options:', requestOptions);
+
 
     // Create abort controller for timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      console.log('Making fetch request...');
+
       const response = await fetch(url, {
         ...requestOptions,
         signal: controller.signal
@@ -84,44 +88,29 @@ class ApiClient {
 
       clearTimeout(timeoutId);
 
-      console.log('API Response received:', response);
-      console.log('Response status:', response.status);
-      console.log('Response headers:', [...response.headers.entries()]);
 
       // Handle response
       if (!response.ok) {
-        console.error('Response not OK, status:', response.status);
         await this.handleErrorResponse(response);
       }
 
       // Try to parse JSON response
       const contentType = response.headers.get('content-type');
-      console.log('Response content type:', contentType);
       
       if (contentType && contentType.includes('application/json')) {
-        console.log('Parsing JSON response...');
         const jsonData = await response.json();
-        console.log('API Response JSON:', jsonData);
-        console.log('===============================');
         return jsonData;
       }
 
-      console.log('===============================');
       return response;
     } catch (error) {
       clearTimeout(timeoutId);
       
-      console.error('=== API CLIENT ERROR ===');
-      console.error('API Request Error:', error);
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
       
       if (error.name === 'AbortError') {
-        console.error('Request timeout');
         throw new Error('Request timeout');
       }
       
-      console.error('========================');
       throw error;
     }
   }
@@ -161,7 +150,6 @@ class ApiClient {
 
   // Handle unauthorized responses
   handleUnauthorized() {
-    console.log('Handling unauthorized response');
     // Clear stored auth data
     localStorage.removeItem(config.auth.tokenStorageKey);
     localStorage.removeItem(config.auth.userStorageKey);
@@ -174,18 +162,12 @@ class ApiClient {
 
   // GET request
   async get(url, options = {}) {
-    console.log('=== API CLIENT GET DEBUG ===');
-    console.log('GET request to:', url);
-    console.log('Options:', options);
     const result = this.request(url, { ...options, method: 'GET' });
-    console.log('GET request result:', result);
-    console.log('============================');
     return result;
   }
 
   // POST request
   async post(url, data = null, options = {}) {
-    console.log('POST request to:', url, 'with data:', data);
     return this.request(url, { 
       ...options, 
       method: 'POST', 
@@ -195,7 +177,7 @@ class ApiClient {
 
   // PUT request
   async put(url, data = null, options = {}) {
-    console.log('PUT request to:', url, 'with data:', data);
+
     return this.request(url, { 
       ...options, 
       method: 'PUT', 
@@ -205,13 +187,13 @@ class ApiClient {
 
   // DELETE request
   async delete(url, options = {}) {
-    console.log('DELETE request to:', url);
+
     return this.request(url, { ...options, method: 'DELETE' });
   }
 
   // PATCH request
   async patch(url, data = null, options = {}) {
-    console.log('PATCH request to:', url, 'with data:', data);
+
     return this.request(url, { 
       ...options, 
       method: 'PATCH', 
@@ -221,7 +203,7 @@ class ApiClient {
 
   // File upload request
   async upload(url, file, options = {}) {
-    console.log('Upload request to:', url, 'with file:', file);
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -240,7 +222,7 @@ class ApiClient {
 
   // External API request (with API key)
   async external(url, options = {}) {
-    console.log('External API request to:', url);
+
     return this.request(url, { ...options, isExternal: true });
   }
 }

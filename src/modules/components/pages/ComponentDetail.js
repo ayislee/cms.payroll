@@ -81,10 +81,6 @@ const ComponentDetail = () => {
             calculation_params: parseCalculationParams(componentData.calculation_params)
           };
 
-          // Debug logging untuk memastikan parsing berhasil
-          console.log('ComponentDetail - Processed component data:', processedData);
-          console.log('ComponentDetail - calculation_params type after processing:', typeof processedData.calculation_params);
-          console.log('ComponentDetail - calculation_params value:', processedData.calculation_params);
 
           setComponent(processedData);
         } else {

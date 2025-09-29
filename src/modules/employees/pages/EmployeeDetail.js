@@ -84,7 +84,6 @@ const EmployeeDetail = () => {
 
   // Debugging: Log when component mounts
   useEffect(() => {
-    console.log('EmployeeDetail component mounted');
   }, []);
 
   // Set document title
@@ -94,12 +93,10 @@ const EmployeeDetail = () => {
   useEffect(() => {
     const loadEmployee = async () => {
       try {
-        console.log('Loading employee data for ID:', id);
         setLoading(true);
         setError('');
 
         const employeeData = await employeeService.getEmployeeById(id);
-        console.log('Employee data loaded:', employeeData);
         
         if (employeeData) {
           setEmployee(employeeData);
@@ -121,24 +118,15 @@ const EmployeeDetail = () => {
 
   // Load employee components when settings tab is active
   useEffect(() => {
-    console.log('=== TAB EFFECT DEBUG ===');
-    console.log('Tab changed, activeTab:', activeTab);
-    console.log('Employee data available:', !!employee);
-    
     const loadEmployeeComponents = async () => {
-      console.log('Active tab:', activeTab);
       if (activeTab === 'settings') {
-        console.log('Settings tab is active, checking employee data...');
         if (employee) {
-          console.log('Employee data exists, employee ID:', employee.employee_id);
           if (employee.employee_id) {
-            console.log('Loading employee components for employee ID:', employee.employee_id);
             try {
               setComponentsLoading(true);
               setComponentsError('');
               
               const components = await employeeComponentService.getEmployeeComponents(employee.employee_id);
-              console.log('Employee components loaded:', components);
               setEmployeeComponents(components || []);
             } catch (error) {
               console.error('Error loading employee components:', error);
@@ -148,32 +136,21 @@ const EmployeeDetail = () => {
               setComponentsLoading(false);
             }
           } else {
-            console.log('Employee ID not available:', employee);
           }
         } else {
-          console.log('Employee data not available yet');
         }
       } else {
-        console.log('Not settings tab, no action needed');
       }
     };
 
     loadEmployeeComponents();
-    console.log('========================');
   }, [activeTab, employee]);
 
   // Debugging: Log tab change events
   const handleTabChange = (key) => {
-    console.log('=== TAB CHANGE DEBUG ===');
-    console.log('Tab change requested, new key:', key);
-    console.log('Previous activeTab value:', activeTab);
     setActiveTab(key);
-    console.log('Active tab state updated to:', key);
-    console.log('Employee data available:', !!employee);
     if (employee) {
-      console.log('Employee ID:', employee.employee_id);
     }
-    console.log('========================');
   };
 
   // Handle delete
@@ -202,7 +179,6 @@ const EmployeeDetail = () => {
 
   // Handle component edit
   const handleEditComponent = (component) => {
-    console.log('Edit component requested:', component);
     setEditingComponent(component.employee_component_id);
     setComponentForm({
       amount: component.amount || 0,
@@ -212,7 +188,6 @@ const EmployeeDetail = () => {
 
   // Handle component form change
   const handleComponentFormChange = (field, value) => {
-    console.log('Component form change, field:', field, 'value:', value);
     setComponentForm(prev => ({
       ...prev,
       [field]: value
@@ -221,7 +196,6 @@ const EmployeeDetail = () => {
 
   // Handle component save
   const handleSaveComponent = async (componentId) => {
-    console.log('Save component requested, componentId:', componentId);
     try {
       const updatedData = {
         employee_component_id: componentId,
@@ -230,7 +204,6 @@ const EmployeeDetail = () => {
       };
       
       await employeeComponentService.updateEmployeeComponent(updatedData);
-      console.log('Component updated successfully');
       
       // Refresh the components list
       const components = await employeeComponentService.getEmployeeComponents(employee.employee_id);
@@ -247,7 +220,6 @@ const EmployeeDetail = () => {
 
   // Handle cancel edit
   const handleCancelEdit = () => {
-    console.log('Cancel edit requested');
     setEditingComponent(null);
     setComponentForm({ amount: 0, is_active: true });
   };

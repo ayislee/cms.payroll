@@ -35,6 +35,13 @@ export const API_ENDPOINTS = {
     DELETE: (id) => `${API_BASE}/employee/${id}`
   },
 
+  // Employee Component Endpoints
+  EMPLOYEE_COMPONENTS: {
+    LIST: (employeeId) => `${API_BASE}/payroll/employee/setting?employee_id=${employeeId}`,
+    UPDATE: `${API_BASE}/payroll/employee/update`,
+    DETAIL: (id) => `${API_BASE}/payroll/employee/get?employee_component_id=${id}`
+  },
+
   // Company Management Endpoints
   COMPANIES: {
     LIST: `${API_BASE}/company`,

@@ -28,7 +28,15 @@ import {
   CTab,
   CTabList,
   CTabContent,
-  CTabPanel
+  CTabPanel,
+  CTable,
+  CTableHead,
+  CTableBody,
+  CTableRow,
+  CTableHeaderCell,
+  CTableDataCell,
+  CFormInput,
+  CFormSwitch
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import {
@@ -45,13 +53,16 @@ import {
   cilInfo,
   cilCreditCard,
   cilBank,
-  cilNotes
+  cilNotes,
+  cilDollar,
+  cilSave
 } from '@coreui/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import { formatDate, formatDateTime, formatPhoneNumber } from '../../../utils/formatters';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import employeeService from '../services/employeeService';
+import employeeComponentService from '../services/employeeComponentService';
 
 const EmployeeDetail = () => {
   const { id } = useParams();
@@ -60,11 +71,21 @@ const EmployeeDetail = () => {
 
   // State management
   const [employee, setEmployee] = useState(null);
+  const [employeeComponents, setEmployeeComponents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [componentsLoading, setComponentsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [componentsError, setComponentsError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
+  const [editingComponent, setEditingComponent] = useState(null);
+  const [componentForm, setComponentForm] = useState({ amount: 0, is_active: true });
+
+  // Debugging: Log when component mounts
+  useEffect(() => {
+    console.log('EmployeeDetail component mounted');
+  }, []);
 
   // Set document title
   useDocumentTitle(employee ? `${employee.name} - Employee Detail` : 'Employee Detail');
@@ -73,10 +94,12 @@ const EmployeeDetail = () => {
   useEffect(() => {
     const loadEmployee = async () => {
       try {
+        console.log('Loading employee data for ID:', id);
         setLoading(true);
         setError('');
 
         const employeeData = await employeeService.getEmployeeById(id);
+        console.log('Employee data loaded:', employeeData);
         
         if (employeeData) {
           setEmployee(employeeData);
@@ -95,6 +118,63 @@ const EmployeeDetail = () => {
       loadEmployee();
     }
   }, [id]);
+
+  // Load employee components when settings tab is active
+  useEffect(() => {
+    console.log('=== TAB EFFECT DEBUG ===');
+    console.log('Tab changed, activeTab:', activeTab);
+    console.log('Employee data available:', !!employee);
+    
+    const loadEmployeeComponents = async () => {
+      console.log('Active tab:', activeTab);
+      if (activeTab === 'settings') {
+        console.log('Settings tab is active, checking employee data...');
+        if (employee) {
+          console.log('Employee data exists, employee ID:', employee.employee_id);
+          if (employee.employee_id) {
+            console.log('Loading employee components for employee ID:', employee.employee_id);
+            try {
+              setComponentsLoading(true);
+              setComponentsError('');
+              
+              const components = await employeeComponentService.getEmployeeComponents(employee.employee_id);
+              console.log('Employee components loaded:', components);
+              setEmployeeComponents(components || []);
+            } catch (error) {
+              console.error('Error loading employee components:', error);
+              setComponentsError(error.message || 'Failed to load employee components');
+              setEmployeeComponents([]);
+            } finally {
+              setComponentsLoading(false);
+            }
+          } else {
+            console.log('Employee ID not available:', employee);
+          }
+        } else {
+          console.log('Employee data not available yet');
+        }
+      } else {
+        console.log('Not settings tab, no action needed');
+      }
+    };
+
+    loadEmployeeComponents();
+    console.log('========================');
+  }, [activeTab, employee]);
+
+  // Debugging: Log tab change events
+  const handleTabChange = (key) => {
+    console.log('=== TAB CHANGE DEBUG ===');
+    console.log('Tab change requested, new key:', key);
+    console.log('Previous activeTab value:', activeTab);
+    setActiveTab(key);
+    console.log('Active tab state updated to:', key);
+    console.log('Employee data available:', !!employee);
+    if (employee) {
+      console.log('Employee ID:', employee.employee_id);
+    }
+    console.log('========================');
+  };
 
   // Handle delete
   const handleDelete = () => {
@@ -118,6 +198,58 @@ const EmployeeDetail = () => {
     } finally {
       setDeleting(false);
     }
+  };
+
+  // Handle component edit
+  const handleEditComponent = (component) => {
+    console.log('Edit component requested:', component);
+    setEditingComponent(component.employee_component_id);
+    setComponentForm({
+      amount: component.amount || 0,
+      is_active: component.is_active || false
+    });
+  };
+
+  // Handle component form change
+  const handleComponentFormChange = (field, value) => {
+    console.log('Component form change, field:', field, 'value:', value);
+    setComponentForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Handle component save
+  const handleSaveComponent = async (componentId) => {
+    console.log('Save component requested, componentId:', componentId);
+    try {
+      const updatedData = {
+        employee_component_id: componentId,
+        amount: parseFloat(componentForm.amount) || 0,
+        is_active: componentForm.is_active
+      };
+      
+      await employeeComponentService.updateEmployeeComponent(updatedData);
+      console.log('Component updated successfully');
+      
+      // Refresh the components list
+      const components = await employeeComponentService.getEmployeeComponents(employee.employee_id);
+      setEmployeeComponents(components || []);
+      
+      // Reset editing state
+      setEditingComponent(null);
+      setComponentForm({ amount: 0, is_active: true });
+    } catch (error) {
+      console.error('Error updating employee component:', error);
+      setComponentsError(error.message || 'Failed to update employee component');
+    }
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    console.log('Cancel edit requested');
+    setEditingComponent(null);
+    setComponentForm({ amount: 0, is_active: true });
   };
 
   if (loading) {
@@ -230,10 +362,10 @@ const EmployeeDetail = () => {
             </CCardHeader>
 
             <CCardBody>
-              <CTabs activeItemKey={activeTab} onActiveItemChange={(key) => setActiveTab(key)}>
+              <CTabs activeItemKey={activeTab} onActiveItemChange={handleTabChange}>
                 <CTabList variant="tabs">
-                  <CTab itemKey="details">Details</CTab>
-                  <CTab itemKey="settings">
+                  <CTab itemKey="details" onClick={() => setActiveTab('details')}>Details</CTab>
+                  <CTab itemKey="settings" onClick={() => setActiveTab('settings')}>
                     <CIcon icon={cilSettings} className="me-1" />
                     Settings
                   </CTab>
@@ -243,313 +375,312 @@ const EmployeeDetail = () => {
                   <CTabPanel className="mt-3" itemKey="details">
                     <CRow>
                       {/* Basic Information */}
-                <CCol lg={6}>
-                  <CCard className="h-100">
-                    <CCardHeader>
-                      <h5 className="mb-0">
-                        <CIcon icon={cilInfo} className="me-2" />
-                        Basic Information
-                      </h5>
-                    </CCardHeader>
-                    <CCardBody>
-                      <CListGroup flush>
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div>
-                            <strong>Employee ID</strong>
-                            <div className="text-medium-emphasis small">Internal ID</div>
-                          </div>
-                          <CBadge color="primary">
-                            #{employee.employee_id}
-                          </CBadge>
-                        </CListGroupItem>
-
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div>
-                            <strong>NIK</strong>
-                            <div className="text-medium-emphasis small">Employee NIK</div>
-                          </div>
-                          <CBadge color="info" className="fs-6">
-                            {employee.nik}
-                          </CBadge>
-                        </CListGroupItem>
-
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div>
-                            <strong>Full Name</strong>
-                            <div className="text-medium-emphasis small">Employee name</div>
-                          </div>
-                          <div className="text-end fw-semibold">
-                            {employee.name}
-                          </div>
-                        </CListGroupItem>
-
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div className="d-flex align-items-center">
-                            <CIcon icon={cilEnvelopeClosed} className="me-2" />
-                            <div>
-                              <strong>Email</strong>
-                              <div className="text-medium-emphasis small">Contact email</div>
-                            </div>
-                          </div>
-                          <div className="text-end">
-                            <a href={`mailto:${employee.email}`} className="text-decoration-none">
-                              {employee.email}
-                            </a>
-                          </div>
-                        </CListGroupItem>
-
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div className="d-flex align-items-center">
-                            <CIcon icon={cilPhone} className="me-2" />
-                            <div>
-                              <strong>Phone</strong>
-                              <div className="text-medium-emphasis small">Contact number</div>
-                            </div>
-                          </div>
-                          <div className="text-end">
-                            {employee.phone ? (
-                              <a href={`tel:${employee.phone}`} className="text-decoration-none">
-                                {formatPhoneNumber(employee.phone)}
-                              </a>
-                            ) : (
-                              <span className="text-muted">-</span>
-                            )}
-                          </div>
-                        </CListGroupItem>
-
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div className="d-flex align-items-center">
-                            <CIcon icon={cilCalendar} className="me-2" />
-                            <div>
-                              <strong>Registration Date</strong>
-                              <div className="text-medium-emphasis small">Date created</div>
-                            </div>
-                          </div>
-                          <div className="text-end">
-                            <div>{formatDate(employee.created_at)}</div>
-                            <small className="text-medium-emphasis">
-                              {formatDateTime(employee.created_at)}
-                            </small>
-                          </div>
-                        </CListGroupItem>
-                      </CListGroup>
-                    </CCardBody>
-                  </CCard>
-                </CCol>
-
-                {/* Company & Status Information */}
-                <CCol lg={6}>
-                  <CCard className="h-100">
-                    <CCardHeader>
-                      <h5 className="mb-0">
-                        <CIcon icon={cilBuilding} className="me-2" />
-                        Company & Status
-                      </h5>
-                    </CCardHeader>
-                    <CCardBody>
-                      <CListGroup flush>
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div>
-                            <strong>Company</strong>
-                            <div className="text-medium-emphasis small">Assigned company</div>
-                          </div>
-                          <div className="text-end">
-                            <CBadge color="info">
-                              Company ID: {employee.company_id}
-                            </CBadge>
-                          </div>
-                        </CListGroupItem>
-
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div>
-                            <strong>PTKP Status</strong>
-                            <div className="text-medium-emphasis small">Tax status</div>
-                          </div>
-                          <div className="text-end">
-                            <CBadge color="secondary" className="fs-6">
-                              {employee.ptkp}
-                            </CBadge>
-                          </div>
-                        </CListGroupItem>
-
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div className="d-flex align-items-center">
-                            <CIcon icon={cilLocationPin} className="me-2" />
-                            <div>
-                              <strong>Address</strong>
-                              <div className="text-medium-emphasis small">Complete address</div>
-                            </div>
-                          </div>
-                          <div className="text-end">
-                            {employee.address ? (
-                              <div className="small">
-                                {employee.address}
-                                {employee.city && (
-                                  <div className="text-medium-emphasis mt-1">
-                                    City: {employee.city}
-                                  </div>
-                                )}
-                                {employee.state && (
-                                  <div className="text-medium-emphasis">
-                                    State: {employee.state}
-                                  </div>
-                                )}
-                                {employee.country && (
-                                  <div className="text-medium-emphasis">
-                                    Country: {employee.country}
-                                  </div>
-                                )}
-                                {employee.zip && (
-                                  <div className="text-medium-emphasis">
-                                    ZIP: {employee.zip}
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted">No address provided</span>
-                            )}
-                          </div>
-                        </CListGroupItem>
-
-                        <CListGroupItem className="d-flex justify-content-between align-items-start">
-                          <div>
-                            <strong>Employment Duration</strong>
-                            <div className="text-medium-emphasis small">Since registration</div>
-                          </div>
-                          <div className="text-end">
-                            <strong>{getEmploymentDuration()}</strong>
-                            <div className="small text-medium-emphasis">
-                              Since {formatDate(employee.created_at)}
-                            </div>
-                          </div>
-                        </CListGroupItem>
-                      </CListGroup>
-                    </CCardBody>
-                  </CCard>
-                </CCol>
-              </CRow>
-
-              {/* Banking Information */}
-              {(employee.rekening || employee.bank || employee.npwp) && (
-                <CRow className="mt-4">
-                  <CCol xs={12}>
-                    <CCard>
-                      <CCardHeader>
-                        <h5 className="mb-0">
-                          <CIcon icon={cilBank} className="me-2" />
-                          Banking & Tax Information
-                        </h5>
-                      </CCardHeader>
-                      <CCardBody>
-                        <CListGroup flush>
-                          {employee.rekening && (
-                            <CListGroupItem className="d-flex justify-content-between align-items-start">
-                              <div className="d-flex align-items-center">
-                                <CIcon icon={cilCreditCard} className="me-2" />
+                      <CCol lg={6}>
+                        <CCard className="h-100">
+                          <CCardHeader>
+                            <h5 className="mb-0">
+                              <CIcon icon={cilInfo} className="me-2" />
+                              Basic Information
+                            </h5>
+                          </CCardHeader>
+                          <CCardBody>
+                            <CListGroup flush>
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
                                 <div>
-                                  <strong>Account Number</strong>
-                                  <div className="text-medium-emphasis small">Bank account</div>
+                                  <strong>Employee ID</strong>
+                                  <div className="text-medium-emphasis small">Internal ID</div>
                                 </div>
-                              </div>
-                              <div className="text-end">
-                                <code>{employee.rekening}</code>
-                                {employee.nama_rekening && (
-                                  <div className="small text-medium-emphasis mt-1">
-                                    Name: {employee.nama_rekening}
-                                  </div>
-                                )}
-                              </div>
-                            </CListGroupItem>
-                          )}
+                                <CBadge color="primary">
+                                  #{employee.employee_id}
+                                </CBadge>
+                              </CListGroupItem>
 
-                          {employee.bank && (
-                            <CListGroupItem className="d-flex justify-content-between align-items-start">
-                              <div>
-                                <strong>Bank</strong>
-                                <div className="text-medium-emphasis small">Banking institution</div>
-                              </div>
-                              <div className="text-end">
-                                <strong>{employee.bank}</strong>
-                                {employee.cabang && (
-                                  <div className="small text-medium-emphasis mt-1">
-                                    Branch: {employee.cabang}
-                                  </div>
-                                )}
-                              </div>
-                            </CListGroupItem>
-                          )}
-
-                          {employee.npwp && (
-                            <CListGroupItem className="d-flex justify-content-between align-items-start">
-                              <div className="d-flex align-items-center">
-                                <CIcon icon={cilNotes} className="me-2" />
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
                                 <div>
-                                  <strong>NPWP</strong>
-                                  <div className="text-medium-emphasis small">Tax identification number</div>
+                                  <strong>NIK</strong>
+                                  <div className="text-medium-emphasis small">Employee NIK</div>
                                 </div>
-                              </div>
-                              <div className="text-end">
-                                <code>{employee.npwp}</code>
-                              </div>
-                            </CListGroupItem>
-                          )}
-                        </CListGroup>
-                      </CCardBody>
-                    </CCard>
-                  </CCol>
-                </CRow>
-              )}
+                                <CBadge color="info" className="fs-6">
+                                  {employee.nik}
+                                </CBadge>
+                              </CListGroupItem>
 
-              {/* System Information */}
-              <CRow className="mt-4">
-                <CCol xs={12}>
-                  <CCard>
-                    <CCardHeader>
-                      <h5 className="mb-0">
-                        <CIcon icon={cilInfo} className="me-2" />
-                        System Information
-                      </h5>
-                    </CCardHeader>
-                    <CCardBody>
-                      <CRow>
-                        <CCol md={6}>
-                          <CListGroup flush>
-                            <CListGroupItem className="d-flex justify-content-between align-items-start">
-                              <div>
-                                <strong>Created At</strong>
-                                <div className="text-medium-emphasis small">Registration date</div>
-                              </div>
-                              <div className="text-end">
-                                <div>{formatDate(employee.created_at)}</div>
-                                <small className="text-medium-emphasis">
-                                  {formatDateTime(employee.created_at)}
-                                </small>
-                              </div>
-                            </CListGroupItem>
-                          </CListGroup>
-                        </CCol>
-                        <CCol md={6}>
-                          <CListGroup flush>
-                            <CListGroupItem className="d-flex justify-content-between align-items-start">
-                              <div>
-                                <strong>Last Updated</strong>
-                                <div className="text-medium-emphasis small">Modification date</div>
-                              </div>
-                              <div className="text-end">
-                                <div>{formatDate(employee.updated_at)}</div>
-                                <small className="text-medium-emphasis">
-                                  {formatDateTime(employee.updated_at)}
-                                </small>
-                              </div>
-                            </CListGroupItem>
-                          </CListGroup>
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div>
+                                  <strong>Full Name</strong>
+                                  <div className="text-medium-emphasis small">Employee name</div>
+                                </div>
+                                <div className="text-end fw-semibold">
+                                  {employee.name}
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div className="d-flex align-items-center">
+                                  <CIcon icon={cilEnvelopeClosed} className="me-2" />
+                                  <div>
+                                    <strong>Email</strong>
+                                    <div className="text-medium-emphasis small">Contact email</div>
+                                  </div>
+                                </div>
+                                <div className="text-end">
+                                  <a href={`mailto:${employee.email}`} className="text-decoration-none">
+                                    {employee.email}
+                                  </a>
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div className="d-flex align-items-center">
+                                  <CIcon icon={cilPhone} className="me-2" />
+                                  <div>
+                                    <strong>Phone</strong>
+                                    <div className="text-medium-emphasis small">Contact number</div>
+                                  </div>
+                                </div>
+                                <div className="text-end">
+                                  {employee.phone ? (
+                                    <a href={`tel:${employee.phone}`} className="text-decoration-none">
+                                      {formatPhoneNumber(employee.phone)}
+                                    </a>
+                                  ) : (
+                                    <span className="text-muted">-</span>
+                                  )}
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div className="d-flex align-items-center">
+                                  <CIcon icon={cilCalendar} className="me-2" />
+                                  <div>
+                                    <strong>Registration Date</strong>
+                                    <div className="text-medium-emphasis small">Date created</div>
+                                  </div>
+                                </div>
+                                <div className="text-end">
+                                  <div>{formatDate(employee.created_at)}</div>
+                                  <small className="text-medium-emphasis">
+                                    {formatDateTime(employee.created_at)}
+                                  </small>
+                                </div>
+                              </CListGroupItem>
+                            </CListGroup>
+                          </CCardBody>
+                        </CCard>
+                      </CCol>
+
+                      {/* Company & Status Information */}
+                      <CCol lg={6}>
+                        <CCard className="h-100">
+                          <CCardHeader>
+                            <h5 className="mb-0">
+                              <CIcon icon={cilBuilding} className="me-2" />
+                              Company & Status
+                            </h5>
+                          </CCardHeader>
+                          <CCardBody>
+                            <CListGroup flush>
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div>
+                                  <strong>Company</strong>
+                                  <div className="text-medium-emphasis small">Assigned company</div>
+                                </div>
+                                <div className="text-end">
+                                  <CBadge color="info">
+                                    Company ID: {employee.company_id}
+                                  </CBadge>
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div>
+                                  <strong>PTKP Status</strong>
+                                  <div className="text-medium-emphasis small">Tax status</div>
+                                </div>
+                                <div className="text-end">
+                                  <CBadge color="secondary" className="fs-6">
+                                    {employee.ptkp}
+                                  </CBadge>
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div className="d-flex align-items-center">
+                                  <CIcon icon={cilLocationPin} className="me-2" />
+                                  <div>
+                                    <strong>Address</strong>
+                                    <div className="text-medium-emphasis small">Complete address</div>
+                                  </div>
+                                </div>
+                                <div className="text-end">
+                                  {employee.address ? (
+                                    <div className="small">
+                                      {employee.address}
+                                      {employee.city && (
+                                        <div className="text-medium-emphasis mt-1">
+                                          City: {employee.city}
+                                        </div>
+                                      )}
+                                      {employee.state && (
+                                        <div className="text-medium-emphasis">
+                                          State: {employee.state}
+                                        </div>
+                                      )}
+                                      {employee.country && (
+                                        <div className="text-medium-emphasis">
+                                          Country: {employee.country}
+                                        </div>
+                                      )}
+                                      {employee.zip && (
+                                        <div className="text-medium-emphasis">
+                                          ZIP: {employee.zip}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted">No address provided</span>
+                                  )}
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div>
+                                  <strong>Employment Duration</strong>
+                                  <div className="text-medium-emphasis small">Since registration</div>
+                                </div>
+                                <div className="text-end">
+                                  <strong>{getEmploymentDuration()}</strong>
+                                  <div className="small text-medium-emphasis">
+                                    Since {formatDate(employee.created_at)}
+                                  </div>
+                                </div>
+                              </CListGroupItem>
+                            </CListGroup>
+                          </CCardBody>
+                        </CCard>
+                      </CCol>
+                    </CRow>
+
+                    {/* Banking Information */}
+                    {(employee.rekening || employee.bank || employee.npwp) && (
+                      <CRow className="mt-4">
+                        <CCol xs={12}>
+                          <CCard>
+                            <CCardHeader>
+                              <h5 className="mb-0">
+                                <CIcon icon={cilBank} className="me-2" />
+                                Banking & Tax Information
+                              </h5>
+                            </CCardHeader>
+                            <CCardBody>
+                              <CListGroup flush>
+                                {employee.rekening && (
+                                  <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                    <div className="d-flex align-items-center">
+                                      <CIcon icon={cilCreditCard} className="me-2" />
+                                      <div>
+                                        <strong>Account Number</strong>
+                                        <div className="text-medium-emphasis small">Bank account</div>
+                                      </div>
+                                    </div>
+                                    <div className="text-end">
+                                      <code>{employee.rekening}</code>
+                                      {employee.nama_rekening && (
+                                        <div className="small text-medium-emphasis mt-1">
+                                          Name: {employee.nama_rekening}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </CListGroupItem>
+                                )}
+
+                                {employee.bank && (
+                                  <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                    <div>
+                                      <strong>Bank</strong>
+                                      <div className="text-medium-emphasis small">Banking institution</div>
+                                    </div>
+                                    <div className="text-end">
+                                      <strong>{employee.bank}</strong>
+                                      {employee.cabang && (
+                                        <div className="small text-medium-emphasis mt-1">
+                                          Branch: {employee.cabang}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </CListGroupItem>
+                                )}
+
+                                {employee.npwp && (
+                                  <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                    <div className="d-flex align-items-center">
+                                      <CIcon icon={cilNotes} className="me-2" />
+                                      <div>
+                                        <strong>NPWP</strong>
+                                        <div className="text-medium-emphasis small">Tax identification number</div>
+                                      </div>
+                                    </div>
+                                    <div className="text-end">
+                                      <code>{employee.npwp}</code>
+                                    </div>
+                                  </CListGroupItem>
+                                )}
+                              </CListGroup>
+                            </CCardBody>
+                          </CCard>
                         </CCol>
                       </CRow>
-                    </CCardBody>
-                  </CCard>
-                </CCol>
-              </CRow>
+                    )}
 
+                    {/* System Information */}
+                    <CRow className="mt-4">
+                      <CCol xs={12}>
+                        <CCard>
+                          <CCardHeader>
+                            <h5 className="mb-0">
+                              <CIcon icon={cilInfo} className="me-2" />
+                              System Information
+                            </h5>
+                          </CCardHeader>
+                          <CCardBody>
+                            <CRow>
+                              <CCol md={6}>
+                                <CListGroup flush>
+                                  <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                    <div>
+                                      <strong>Created At</strong>
+                                      <div className="text-medium-emphasis small">Registration date</div>
+                                    </div>
+                                    <div className="text-end">
+                                      <div>{formatDate(employee.created_at)}</div>
+                                      <small className="text-medium-emphasis">
+                                        {formatDateTime(employee.created_at)}
+                                      </small>
+                                    </div>
+                                  </CListGroupItem>
+                                </CListGroup>
+                              </CCol>
+                              <CCol md={6}>
+                                <CListGroup flush>
+                                  <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                    <div>
+                                      <strong>Last Updated</strong>
+                                      <div className="text-medium-emphasis small">Modification date</div>
+                                    </div>
+                                    <div className="text-end">
+                                      <div>{formatDate(employee.updated_at)}</div>
+                                      <small className="text-medium-emphasis">
+                                        {formatDateTime(employee.updated_at)}
+                                      </small>
+                                    </div>
+                                  </CListGroupItem>
+                                </CListGroup>
+                              </CCol>
+                            </CRow>
+                          </CCardBody>
+                        </CCard>
+                      </CCol>
+                    </CRow>
                   </CTabPanel>
 
                   <CTabPanel className="mt-3" itemKey="settings">
@@ -559,33 +690,130 @@ const EmployeeDetail = () => {
                           <CCardHeader>
                             <h5 className="mb-0">
                               <CIcon icon={cilSettings} className="me-2" />
-                              Employee Settings
+                              Employee Payroll Components
                             </h5>
                           </CCardHeader>
                           <CCardBody>
-                            <CAlert color="info">
-                              <CIcon icon={cilInfo} className="me-2" />
-                              <strong>Employee Settings</strong>
-                              <br />
-                              <small>
-                                Configure employee-specific settings and preferences.
-                                This section allows you to manage various employee configurations.
-                              </small>
-                            </CAlert>
-
-                            <div className="text-center text-muted py-4">
-                              <CIcon icon={cilSettings} size="xl" className="mb-3" />
-                              <p>Employee settings functionality will be implemented here.</p>
-                              <small>
-                                This section can include settings like:
-                                <ul className="list-unstyled mt-2">
-                                  <li>• Notification preferences</li>
-                                  <li>• Payroll calculation preferences</li>
-                                  <li>• Leave management settings</li>
-                                  <li>• Integration settings</li>
-                                </ul>
-                              </small>
-                            </div>
+                            {componentsLoading ? (
+                              <div className="d-flex justify-content-center align-items-center" style={{ height: '200px' }}>
+                                <CSpinner color="primary" />
+                                <span className="ms-2">Loading payroll components...</span>
+                              </div>
+                            ) : componentsError ? (
+                              <CAlert color="danger">
+                                {componentsError}
+                              </CAlert>
+                            ) : (
+                              <>
+                                <p className="text-medium-emphasis">
+                                  Manage payroll components for this employee. You can set specific amounts for each component.
+                                </p>
+                                
+                                {employeeComponents.length > 0 ? (
+                                  <CTable responsive hover>
+                                    <CTableHead>
+                                      <CTableRow>
+                                        <CTableHeaderCell>Component Name</CTableHeaderCell>
+                                        <CTableHeaderCell>Type</CTableHeaderCell>
+                                        <CTableHeaderCell>Amount</CTableHeaderCell>
+                                        <CTableHeaderCell>Status</CTableHeaderCell>
+                                        <CTableHeaderCell>Actions</CTableHeaderCell>
+                                      </CTableRow>
+                                    </CTableHead>
+                                    <CTableBody>
+                                      {employeeComponents.map((component) => (
+                                        <CTableRow key={component.employee_component_id}>
+                                          <CTableDataCell>
+                                            <div>
+                                              <strong>{component.mainComponent?.name || 'N/A'}</strong>
+                                              <div className="small text-medium-emphasis">
+                                                {component.mainComponent?.description || 'No description'}
+                                              </div>
+                                            </div>
+                                          </CTableDataCell>
+                                          <CTableDataCell>
+                                            <CBadge 
+                                              color={component.mainComponent?.type === 'Earning' ? 'success' : 'danger'}
+                                            >
+                                              {component.mainComponent?.type || 'N/A'}
+                                            </CBadge>
+                                          </CTableDataCell>
+                                          <CTableDataCell>
+                                            {editingComponent === component.employee_component_id ? (
+                                              <CFormInput
+                                                type="number"
+                                                value={componentForm.amount}
+                                                onChange={(e) => handleComponentFormChange('amount', e.target.value)}
+                                                step="0.01"
+                                                min="0"
+                                              />
+                                            ) : (
+                                              <div>
+                                                {component.mainComponent?.type === 'Earning' ? '+' : '-'} 
+                                                {parseFloat(component.amount || 0).toLocaleString('id-ID', {
+                                                  style: 'currency',
+                                                  currency: 'IDR',
+                                                  minimumFractionDigits: 0,
+                                                  maximumFractionDigits: 0
+                                                })}
+                                              </div>
+                                            )}
+                                          </CTableDataCell>
+                                          <CTableDataCell>
+                                            {editingComponent === component.employee_component_id ? (
+                                              <CFormSwitch
+                                                checked={componentForm.is_active}
+                                                onChange={(e) => handleComponentFormChange('is_active', e.target.checked)}
+                                                size="sm"
+                                              />
+                                            ) : (
+                                              <CBadge color={component.is_active ? 'success' : 'secondary'}>
+                                                {component.is_active ? 'Active' : 'Inactive'}
+                                              </CBadge>
+                                            )}
+                                          </CTableDataCell>
+                                          <CTableDataCell>
+                                            {editingComponent === component.employee_component_id ? (
+                                              <div className="d-flex gap-1">
+                                                <CButton 
+                                                  color="success" 
+                                                  size="sm"
+                                                  onClick={() => handleSaveComponent(component.employee_component_id)}
+                                                >
+                                                  <CIcon icon={cilSave} size="sm" />
+                                                </CButton>
+                                                <CButton 
+                                                  color="secondary" 
+                                                  size="sm"
+                                                  onClick={handleCancelEdit}
+                                                >
+                                                  Cancel
+                                                </CButton>
+                                              </div>
+                                            ) : (
+                                              <CButton 
+                                                color="primary" 
+                                                size="sm"
+                                                onClick={() => handleEditComponent(component)}
+                                              >
+                                                <CIcon icon={cilPencil} size="sm" />
+                                              </CButton>
+                                            )}
+                                          </CTableDataCell>
+                                        </CTableRow>
+                                      ))}
+                                    </CTableBody>
+                                  </CTable>
+                                ) : (
+                                  <div className="text-center py-5">
+                                    <CIcon icon={cilDollar} size="3xl" className="text-muted mb-3" />
+                                    <p className="text-medium-emphasis">
+                                      No payroll components found for this employee.
+                                    </p>
+                                  </div>
+                                )}
+                              </>
+                            )}
                           </CCardBody>
                         </CCard>
                       </CCol>

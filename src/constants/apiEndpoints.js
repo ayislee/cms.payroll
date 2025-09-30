@@ -32,7 +32,8 @@ export const API_ENDPOINTS = {
     DETAIL: (id) => `${API_BASE}/employee/show?employee_id=${id}`,
     CREATE: `${API_BASE}/employee`,
     UPDATE: `${API_BASE}/employee/`,
-    DELETE: (id) => `${API_BASE}/employee/${id}`
+    DELETE: (id) => `${API_BASE}/employee/${id}`,
+    GET_ALL: `${API_BASE}/employee/get-all-employee`
   },
 
   // Employee Component Endpoints
@@ -67,7 +68,7 @@ export const API_ENDPOINTS = {
   PAYROLL: {
     LIST: `${API_BASE}/payroll`,
     DETAIL: (id) => `${API_BASE}/payroll/${id}`,
-    GENERATE: `${API_BASE}/payroll`,
+    GENERATE: `${API_BASE}/payroll/generate`,
     MASS_GENERATE: `${API_BASE}/payroll/mass`,
     UPDATE: (id) => `${API_BASE}/payroll/${id}`,
     MARK_PRINTED: (id) => `${API_BASE}/payroll/${id}/print`,
@@ -76,9 +77,7 @@ export const API_ENDPOINTS = {
 
   // Attendance Management Endpoints
   ATTENDANCE: {
-    BULK_INSERT: `${API_BASE}/external/attendance/bulk`,
-    DETAIL: (employeeId, payrollPeriod) => `${API_BASE}/external/attendance/${employeeId}/${payrollPeriod}`,
-    SYNC: `${API_BASE}/external/attendance/sync`
+    LIST: `${API_BASE}/attendance`
   },
 
   // External API Endpoints

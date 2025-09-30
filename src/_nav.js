@@ -63,22 +63,11 @@ const _nav = [
     icon: <CIcon icon={cilCash} customClassName="nav-icon" />
   },
   {
-    component: CNavGroup,
+    component: CNavItem,
     name: 'Attendance',
     to: '/attendance',
     icon: <CIcon icon={cilCalendar} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'Attendance Data',
-        to: '/attendance'
-      },
-      {
-        component: CNavItem,
-        name: 'Sync Attendance',
-        to: '/attendance/sync'
-      }
-    ]
+    
   },
   {
     component: CNavTitle,

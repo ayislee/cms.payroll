@@ -38,7 +38,6 @@ const PayrollMassGenerate = React.lazy(() => import('../modules/payroll/pages/Pa
 
 // Attendance Management
 const AttendanceList = React.lazy(() => import('../modules/attendance/pages/AttendanceList'));
-const AttendanceSync = React.lazy(() => import('../modules/attendance/pages/AttendanceSync'));
 
 // Reports
 const ReportList = React.lazy(() => import('../modules/reports/pages/ReportList'));
@@ -196,12 +195,7 @@ const payrollRoutes = [
     exact: true,
     requiredPermissions: [PERMISSIONS.ATTENDANCE_VIEW]
   },
-  {
-    path: '/attendance/sync',
-    name: 'Sync Attendance',
-    element: AttendanceSync,
-    requiredPermissions: [PERMISSIONS.ATTENDANCE_SYNC]
-  },
+
 
   // Reports Routes
   {

@@ -245,9 +245,32 @@ class EmployeeService {
     };
     return ptkpMap[ptkp] || ptkp;
   }
+
+  // Get all employees for search functionality
+  async getAllEmployees(searchTerm = '') {
+    console.log('getAllEmployees called with searchTerm:', searchTerm);
+    try {
+      // Use GET method with query parameters instead of POST
+      const queryParams = new URLSearchParams();
+      if (searchTerm) {
+        queryParams.append('search', searchTerm);
+      }
+      
+      const url = `${API_ENDPOINTS.EMPLOYEES.GET_ALL}?${queryParams.toString()}`;
+      console.log('getAllEmployees URL:', url);
+      
+      const response = await apiClient.get(url);
+      console.log('getAllEmployees response:', response);
+      return response.data?.data || response.data || [];
+    } catch (error) {
+      console.error('Error in getAllEmployees:', error);
+      throw this.handleError(error);
+    }
+  }
 }
 
 // Create singleton instance
 const employeeService = new EmployeeService();
+console.log('EmployeeService instance created with methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(employeeService)));
 
 export default employeeService;

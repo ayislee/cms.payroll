@@ -34,8 +34,34 @@ class PayrollService {
       const response = await apiClient.get(url);
       console.log('Payroll response:', response);
       
-      // Simplified approach - just return the data as-is like userService does
-      return response.data || { total: 0, data: [] };
+      // Handle the specific response structure we're getting:
+      // { status: true, message: "...", data: { total, perPage, page, lastPage, data: [...] } }
+      if (response && response.data) {
+        console.log('Response has data structure:', response.data);
+        if (response.data.data) {
+          console.log('Response data.data structure:', response.data.data);
+          
+          return {
+            data: response.data.data || [],
+            pages: response.data.lastPage || 1,
+            total: response.data.total || 0
+          };
+        } else {
+          // Handle case where response.data is the array directly
+          console.log('Response data is array directly:', response.data);
+          return {
+            data: Array.isArray(response.data) ? response.data : [],
+            pages: 1,
+            total: Array.isArray(response.data) ? response.data.length : 0
+          };
+        }
+      }
+      
+      return {
+        data: [],
+        pages: 1,
+        total: 0
+      };
     } catch (error) {
       console.error('Error fetching payrolls:', error);
       throw this.handleError(error);

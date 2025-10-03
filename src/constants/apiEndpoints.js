@@ -77,7 +77,10 @@ export const API_ENDPOINTS = {
 
   // Attendance Management Endpoints
   ATTENDANCE: {
-    LIST: `${API_BASE}/attendance`
+    LIST: `${API_BASE}/attendance`,
+    CREATE: `${API_BASE}/attendance/store`,
+    UPDATE: `${API_BASE}/attendance/update`,
+    DELETE: (id) => `${API_BASE}/attendance/delete/${id}`
   },
 
   // External API Endpoints

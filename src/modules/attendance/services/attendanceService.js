@@ -47,6 +47,32 @@ class AttendanceService {
     }
   }
 
+  async createAttendance(data) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.ATTENDANCE.CREATE, data);
+      return response?.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async updateAttendance(data) {
+    try {
+      const response = await apiClient.put(API_ENDPOINTS.ATTENDANCE.UPDATE, data);
+      return response?.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async deleteAttendance(attendanceId) {
+    try {
+      const response = await apiClient.delete(API_ENDPOINTS.ATTENDANCE.DELETE(attendanceId));
+      return response?.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
   // Handle API errors
   handleError(error) {
     console.error('API Error:', error);

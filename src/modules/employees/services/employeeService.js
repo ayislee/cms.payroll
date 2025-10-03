@@ -246,24 +246,38 @@ class EmployeeService {
     return ptkpMap[ptkp] || ptkp;
   }
 
-  // Get all employees for search functionality
-  async getAllEmployees(searchTerm = '') {
-    console.log('getAllEmployees called with searchTerm:', searchTerm);
+  // Get all employees for lightweight selectors / search
+  async getAllEmployees(params = '') {
     try {
-      // Use GET method with query parameters instead of POST
       const queryParams = new URLSearchParams();
-      if (searchTerm) {
-        queryParams.append('search', searchTerm);
+
+      if (typeof params === 'string') {
+        const trimmed = params.trim();
+        if (trimmed) {
+          queryParams.append('search', trimmed);
+        }
+      } else if (params && typeof params === 'object') {
+        const { search, ...rest } = params;
+
+        if (search && typeof search === 'string' && search.trim()) {
+          queryParams.append('search', search.trim());
+        }
+
+        Object.entries(rest).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            queryParams.append(key, String(value));
+          }
+        });
       }
-      
-      const url = `${API_ENDPOINTS.EMPLOYEES.GET_ALL}?${queryParams.toString()}`;
-      console.log('getAllEmployees URL:', url);
-      
+
+      const queryString = queryParams.toString();
+      const url = queryString
+        ? `${API_ENDPOINTS.EMPLOYEES.GET_ALL}?${queryString}`
+        : API_ENDPOINTS.EMPLOYEES.GET_ALL;
+
       const response = await apiClient.get(url);
-      console.log('getAllEmployees response:', response);
       return response.data?.data || response.data || [];
     } catch (error) {
-      console.error('Error in getAllEmployees:', error);
       throw this.handleError(error);
     }
   }

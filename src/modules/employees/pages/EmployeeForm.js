@@ -27,7 +27,8 @@ import {
   cilSave,
   cilArrowLeft,
   cilUser,
-  cilCreditCard
+  cilCreditCard,
+  cilNotes
 } from '@coreui/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
@@ -60,6 +61,9 @@ const EmployeeForm = () => {
     zip: '',
     company_id: '',
     ptkp: '',
+    job_position: '',
+    grade: '',
+    organization: '',
     rekening: '',
     bank: '',
     cabang: '',
@@ -150,6 +154,9 @@ const EmployeeForm = () => {
             zip: employee.zip || '',
             company_id: employee.company_id || '',
             ptkp: employee.ptkp || '',
+            job_position: employee.job_position || '',
+            grade: employee.grade || '',
+            organization: employee.organization || '',
             rekening: employee.rekening || '',
             bank: employee.bank || '',
             cabang: employee.cabang || '',
@@ -467,6 +474,56 @@ const EmployeeForm = () => {
                           {errors.ptkp}
                         </div>
                       )}
+                    </div>
+                  </CCol>
+
+                  {/* Job Details */}
+                  <CCol xs={12}>
+                    <h5 className="mt-2 mb-3">
+                      <CIcon icon={cilNotes} className="me-2" />
+                      Job Details
+                    </h5>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="mb-3">
+                      <CFormLabel htmlFor="job_position">Job Position</CFormLabel>
+                      <CFormInput
+                        type="text"
+                        id="job_position"
+                        name="job_position"
+                        value={formData.job_position}
+                        onChange={handleInputChange}
+                        placeholder="e.g., Payroll Specialist"
+                      />
+                    </div>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="mb-3">
+                      <CFormLabel htmlFor="grade">Grade</CFormLabel>
+                      <CFormInput
+                        type="text"
+                        id="grade"
+                        name="grade"
+                        value={formData.grade}
+                        onChange={handleInputChange}
+                        placeholder="e.g., G6"
+                      />
+                    </div>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="mb-3">
+                      <CFormLabel htmlFor="organization">Organization</CFormLabel>
+                      <CFormInput
+                        type="text"
+                        id="organization"
+                        name="organization"
+                        value={formData.organization}
+                        onChange={handleInputChange}
+                        placeholder="e.g., Finance Division"
+                      />
                     </div>
                   </CCol>
 

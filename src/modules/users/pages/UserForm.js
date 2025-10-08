@@ -2,7 +2,7 @@
 // USER FORM PAGE
 // ========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   CRow,
@@ -13,7 +13,6 @@ import {
   CForm,
   CFormLabel,
   CFormInput,
-  CFormTextarea,
   CFormSelect,
   CButton,
   CSpinner,
@@ -28,8 +27,14 @@ import {
 } from '@coreui/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
-import { PERMISSIONS } from '../../../constants/userRoles';
+import { PERMISSIONS, USER_ROLES } from '../../../constants/userRoles';
 import userService from '../services/userService';
+import companyService from '../../companies/services/companyService';
+
+const USER_TYPE_OPTIONS = [
+  { value: USER_ROLES.ADMIN, label: 'Admin' },
+  { value: USER_ROLES.USER, label: 'Member' }
+];
 
 const UserForm = () => {
   const { id } = useParams();
@@ -44,15 +49,28 @@ const UserForm = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    username: '',
     phone: '',
-    address: '',
+    type: USER_ROLES.USER,
+    company_id: '',
     is_active: true
   });
+  const [companyOptions, setCompanyOptions] = useState([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [companyFallbackOption, setCompanyFallbackOption] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '',
+    new_password: '',
+    new_password_confirmation: '',
+    confirm_password: ''
+  });
+  const [passwordErrors, setPasswordErrors] = useState({});
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordErrorMessage, setPasswordErrorMessage] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Load user data for edit
   const loadUser = async () => {
@@ -60,14 +78,23 @@ const UserForm = () => {
       setLoading(true);
       setError('');
       const userData = await userService.getUserById(id);
-      setFormData({
-        name: userData.name || '',
-        email: userData.email || '',
-        username: userData.username || '',
-        phone: userData.phone || '',
-        address: userData.address || '',
-        is_active: userData.is_active
-      });
+      const typeValue = userData.type || USER_ROLES.USER;
+      if (typeValue === USER_ROLES.USER && userData.company_id) {
+        setCompanyFallbackOption({
+          value: String(userData.company_id),
+          label: userData.company_name || `Company #${userData.company_id}`
+        });
+      } else {
+      setCompanyFallbackOption(null);
+    }
+    setFormData({
+      name: userData.name || '',
+      email: userData.email || '',
+      phone: userData.phone || '',
+      type: typeValue,
+      company_id: typeValue === USER_ROLES.USER && userData.company_id ? String(userData.company_id) : '',
+      is_active: userData.is_active
+    });
     } catch (error) {
       console.error('Error loading user:', error);
       setError(error.message || 'Failed to load user');
@@ -83,23 +110,106 @@ const UserForm = () => {
     }
   }, [isEdit, id]);
 
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        setLoadingCompanies(true);
+        const options = await companyService.getCompanyOptions();
+        setCompanyOptions(options);
+      } catch (err) {
+        console.error('Error loading companies:', err);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+
+    fetchCompanies();
+  }, []);
+
   // Handle input changes
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     const processedValue = type === 'checkbox' ? checked : value;
 
-    setFormData(prev => ({
+    if (name === 'type' && processedValue !== USER_ROLES.USER) {
+      setCompanyFallbackOption(null);
+    }
+
+    setFormData(prev => {
+      if (name === 'type') {
+        const nextType = processedValue;
+        return {
+          ...prev,
+          type: nextType,
+          company_id: nextType === USER_ROLES.USER ? prev.company_id : ''
+        };
+      }
+
+      return {
+        ...prev,
+        [name]: processedValue
+      };
+    });
+
+    if (validationErrors[name] || (name === 'type' && validationErrors.company_id)) {
+      setValidationErrors(prev => {
+        const updated = { ...prev };
+        delete updated[name];
+        if (name === 'type') {
+          delete updated.company_id;
+        }
+        return updated;
+      });
+    }
+  };
+
+  const handlePasswordInputChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordForm(prev => ({
       ...prev,
-      [name]: processedValue
+      [name]: value
     }));
 
-    // Clear validation error for this field
-    if (validationErrors[name]) {
-      setValidationErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+    if (passwordErrors[name]) {
+      setPasswordErrors(prev => {
+        const updated = { ...prev };
+        delete updated[name];
+        return updated;
+      });
     }
+  };
+
+  const validatePasswordForm = () => {
+    const errors = {};
+    const trimmedCurrent = passwordForm.current_password?.trim() || '';
+    const trimmedNew = passwordForm.new_password || '';
+    const trimmedConfirm = passwordForm.new_password_confirmation || '';
+    const trimmedFinalConfirm = passwordForm.confirm_password || '';
+
+    if (!trimmedCurrent) {
+      errors.current_password = 'Current password is required.';
+    }
+
+    if (!trimmedNew) {
+      errors.new_password = 'New password is required.';
+    } else if (trimmedNew.length < 8) {
+      errors.new_password = 'New password must be at least 8 characters.';
+    }
+
+    if (!trimmedConfirm) {
+      errors.new_password_confirmation = 'Please confirm the new password.';
+    } else if (trimmedNew !== trimmedConfirm) {
+      errors.new_password_confirmation = 'Password confirmation does not match.';
+    }
+
+    if (!trimmedFinalConfirm) {
+      errors.confirm_password = 'Please re-enter the new password.';
+    } else if (trimmedNew !== trimmedFinalConfirm) {
+      errors.confirm_password = 'New password and confirmation must match.';
+    }
+
+    setPasswordErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // Handle form submission
@@ -110,17 +220,22 @@ const UserForm = () => {
       setSaving(true);
       setError('');
 
+      const submissionData = {
+        ...formData,
+        company_id: formData.type === USER_ROLES.USER ? formData.company_id : ''
+      };
+
       // Client-side validation
-      const validation = userService.validateUserData(formData);
+      const validation = userService.validateUserData(submissionData);
       if (!validation.isValid) {
         setValidationErrors(validation.errors);
         return;
       }
 
       if (isEdit) {
-        await userService.updateUser(id, formData);
+        await userService.updateUser(id, submissionData);
       } else {
-        await userService.createUser(formData);
+        await userService.createUser(submissionData);
       }
 
       // Navigate back to user list
@@ -144,6 +259,73 @@ const UserForm = () => {
       setSaving(false);
     }
   };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!isEdit || !id) {
+      return;
+    }
+    setPasswordSuccess('');
+    setPasswordErrorMessage('');
+
+    if (!validatePasswordForm()) {
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      await userService.changePassword(id, {
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+        new_password_confirmation: passwordForm.new_password_confirmation,
+        confirm_password: passwordForm.confirm_password
+      });
+
+      setPasswordSuccess('Password updated successfully.');
+      setPasswordForm({
+        current_password: '',
+        new_password: '',
+        new_password_confirmation: '',
+        confirm_password: ''
+      });
+      setPasswordErrors({});
+    } catch (error) {
+      console.error('Error changing password:', error);
+      setPasswordErrorMessage(error.message || 'Failed to change password');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const companySelectOptions = useMemo(() => {
+    if (formData.type !== USER_ROLES.USER) {
+      return companyOptions;
+    }
+
+    if (!formData.company_id) {
+      return companyOptions;
+    }
+
+    const exists = companyOptions.some(
+      option => String(option.value) === String(formData.company_id)
+    );
+
+    if (exists) {
+      return companyOptions;
+    }
+
+    if (companyFallbackOption) {
+      return [...companyOptions, companyFallbackOption];
+    }
+
+    return [
+      ...companyOptions,
+      {
+        value: formData.company_id,
+        label: `Company #${formData.company_id}`
+      }
+    ];
+  }, [companyOptions, companyFallbackOption, formData.type, formData.company_id]);
 
   if (loading) {
     return (
@@ -250,24 +432,59 @@ const UserForm = () => {
                     )}
                   </div>
 
-                  {/* Username */}
+                  {/* User Type */}
                   <div className="mb-3">
-                    <CFormLabel htmlFor="username">
-                      <strong>Username *</strong>
+                    <CFormLabel htmlFor="type">
+                      <strong>User Type *</strong>
                     </CFormLabel>
-                    <CFormInput
-                      id="username"
-                      name="username"
-                      value={formData.username}
+                    <CFormSelect
+                      id="type"
+                      name="type"
+                      value={formData.type}
                       onChange={handleInputChange}
-                      placeholder="Enter username"
                       disabled={saving}
-                      invalid={!!validationErrors.username}
-                    />
-                    {validationErrors.username && (
-                      <small className="text-danger">{validationErrors.username}</small>
+                      invalid={!!validationErrors.type}
+                    >
+                      <option value="">Select user type</option>
+                      {USER_TYPE_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </CFormSelect>
+                    {validationErrors.type && (
+                      <small className="text-danger">{validationErrors.type}</small>
                     )}
                   </div>
+
+                  {formData.type === USER_ROLES.USER && (
+                    <div className="mb-3">
+                      <CFormLabel htmlFor="company_id">
+                        <strong>Company *</strong>
+                      </CFormLabel>
+                      <CFormSelect
+                        id="company_id"
+                        name="company_id"
+                        value={formData.company_id}
+                        onChange={handleInputChange}
+                        disabled={saving || loadingCompanies}
+                        invalid={!!validationErrors.company_id}
+                      >
+                        <option value="">Select company</option>
+                        {companySelectOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </CFormSelect>
+                      {loadingCompanies && (
+                        <small className="text-muted d-block mt-1">Loading companies...</small>
+                      )}
+                      {validationErrors.company_id && (
+                        <small className="text-danger d-block">{validationErrors.company_id}</small>
+                      )}
+                    </div>
+                  )}
 
                   {/* Phone */}
                   <div className="mb-3">
@@ -288,27 +505,6 @@ const UserForm = () => {
                 </CCol>
 
                 <CCol md={6}>
-                  {/* Address */}
-                  <div className="mb-3">
-                    <CFormLabel htmlFor="address">Address</CFormLabel>
-                    <CFormTextarea
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder="Enter address"
-                      rows={4}
-                      disabled={saving}
-                      invalid={!!validationErrors.address}
-                    />
-                    <small className="text-muted">
-                      Maximum 500 characters
-                    </small>
-                    {validationErrors.address && (
-                      <small className="text-danger">{validationErrors.address}</small>
-                    )}
-                  </div>
-
                   {/* Active Status */}
                   <div className="mb-4">
                     <CFormCheck
@@ -328,6 +524,121 @@ const UserForm = () => {
                       }
                     />
                   </div>
+
+                  {isEdit && (
+                    <CCard>
+                      <CCardHeader>
+                        <h5 className="mb-0">Change Password</h5>
+                      </CCardHeader>
+                      <CCardBody>
+                        {passwordSuccess && (
+                          <CAlert color="success" className="mb-3">
+                            {passwordSuccess}
+                          </CAlert>
+                        )}
+
+                        {passwordErrorMessage && (
+                          <CAlert color="danger" className="mb-3">
+                            {passwordErrorMessage}
+                          </CAlert>
+                        )}
+
+                        <div className="mb-3">
+                          <CFormLabel htmlFor="current_password">
+                            Current Password <span className="text-danger">*</span>
+                          </CFormLabel>
+                          <CFormInput
+                            type="password"
+                            id="current_password"
+                            name="current_password"
+                            value={passwordForm.current_password}
+                            onChange={handlePasswordInputChange}
+                            disabled={changingPassword}
+                            invalid={!!passwordErrors.current_password}
+                            autoComplete="current-password"
+                          />
+                          {passwordErrors.current_password && (
+                            <small className="text-danger">{passwordErrors.current_password}</small>
+                          )}
+                        </div>
+
+                        <div className="mb-3">
+                          <CFormLabel htmlFor="new_password">
+                            New Password <span className="text-danger">*</span>
+                          </CFormLabel>
+                          <CFormInput
+                            type="password"
+                            id="new_password"
+                            name="new_password"
+                            value={passwordForm.new_password}
+                            onChange={handlePasswordInputChange}
+                            disabled={changingPassword}
+                            invalid={!!passwordErrors.new_password}
+                            autoComplete="new-password"
+                          />
+                          {passwordErrors.new_password && (
+                            <small className="text-danger">{passwordErrors.new_password}</small>
+                          )}
+                        </div>
+
+                        <div className="mb-3">
+                          <CFormLabel htmlFor="new_password_confirmation">
+                            Confirm New Password <span className="text-danger">*</span>
+                          </CFormLabel>
+                          <CFormInput
+                            type="password"
+                            id="new_password_confirmation"
+                            name="new_password_confirmation"
+                            value={passwordForm.new_password_confirmation}
+                            onChange={handlePasswordInputChange}
+                            disabled={changingPassword}
+                            invalid={!!passwordErrors.new_password_confirmation}
+                            autoComplete="new-password"
+                          />
+                          {passwordErrors.new_password_confirmation && (
+                            <small className="text-danger">{passwordErrors.new_password_confirmation}</small>
+                          )}
+                        </div>
+
+                        <div className="mb-3">
+                          <CFormLabel htmlFor="confirm_password">
+                            Re-enter New Password <span className="text-danger">*</span>
+                          </CFormLabel>
+                          <CFormInput
+                            type="password"
+                            id="confirm_password"
+                            name="confirm_password"
+                            value={passwordForm.confirm_password}
+                            onChange={handlePasswordInputChange}
+                            disabled={changingPassword}
+                            invalid={!!passwordErrors.confirm_password}
+                            autoComplete="new-password"
+                          />
+                          {passwordErrors.confirm_password && (
+                            <small className="text-danger">{passwordErrors.confirm_password}</small>
+                          )}
+                        </div>
+
+                        <div className="d-flex justify-content-end">
+                          <CButton
+                            color="primary"
+                            type="button"
+                            onClick={handlePasswordSubmit}
+                            disabled={changingPassword}
+                          >
+                            {changingPassword ? (
+                              <>
+                                <CSpinner size="sm" className="me-2" />
+                                Changing...
+                              </>
+                            ) : (
+                              'Change Password'
+                            )}
+                          </CButton>
+                        </div>
+                      </CCardBody>
+                    </CCard>
+                  )}
                 </CCol>
               </CRow>
 

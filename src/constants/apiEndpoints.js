@@ -23,7 +23,8 @@ export const API_ENDPOINTS = {
     CREATE: `${API_BASE}/user`,
     UPDATE: (id) => `${API_BASE}/user/${id}`,
     DELETE: (id) => `${API_BASE}/user/${id}`,
-    TOGGLE_STATUS: (id) => `${API_BASE}/user/${id}/toggle-status`
+    TOGGLE_STATUS: (id) => `${API_BASE}/user/${id}/toggle-status`,
+    CHANGE_PASSWORD: (id) => `${API_BASE}/user/${id}/change-password`
   },
 
   // Employee Management Endpoints

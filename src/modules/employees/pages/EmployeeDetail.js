@@ -423,6 +423,39 @@ const EmployeeDetail = () => {
 
                               <CListGroupItem className="d-flex justify-content-between align-items-start">
                                 <div className="d-flex align-items-center">
+                                  <CIcon icon={cilNotes} className="me-2" />
+                                  <div>
+                                    <strong>Job Position</strong>
+                                    <div className="text-medium-emphasis small">Current role</div>
+                                  </div>
+                                </div>
+                                <div className="text-end fw-semibold">
+                                  {employee.job_position ? employee.job_position : <span className="text-muted">-</span>}
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div>
+                                  <strong>Grade</strong>
+                                  <div className="text-medium-emphasis small">Employee level</div>
+                                </div>
+                                <div className="text-end fw-semibold">
+                                  {employee.grade ? employee.grade : <span className="text-muted">-</span>}
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div>
+                                  <strong>Organization</strong>
+                                  <div className="text-medium-emphasis small">Business unit</div>
+                                </div>
+                                <div className="text-end fw-semibold">
+                                  {employee.organization ? employee.organization : <span className="text-muted">-</span>}
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div className="d-flex align-items-center">
                                   <CIcon icon={cilCalendar} className="me-2" />
                                   <div>
                                     <strong>Registration Date</strong>

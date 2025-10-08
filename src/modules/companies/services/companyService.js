@@ -217,7 +217,7 @@ class CompanyService {
       const response = await this.getActiveCompanies({ page: 1, rows: 100 });
       return (response.data || []).map(company => ({
         value: company.company_id,
-        label: `${company.code} - ${company.name}`,
+        label: `${company.name}`,
         company: company
       }));
     } catch (error) {

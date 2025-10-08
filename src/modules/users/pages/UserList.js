@@ -47,9 +47,53 @@ import {
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import { formatDate, formatPhoneNumber } from '../../../utils/formatters';
-import { PERMISSIONS } from '../../../constants/userRoles';
+import { PERMISSIONS, USER_ROLES } from '../../../constants/userRoles';
 import userService from '../services/userService';
 import config from '../../../config/environment';
+
+const USER_TYPE_BADGE = {
+  admin: { color: 'primary', label: 'Admin' },
+  hr: { color: 'info', label: 'HR' },
+  finance: { color: 'warning', label: 'Finance' },
+  manager: { color: 'secondary', label: 'Manager' },
+  user: { color: 'dark', label: 'Member' }
+};
+
+const getUserTypeBadge = (type) => {
+  if (!type || typeof type !== 'string') {
+    return { color: 'light', label: 'Unknown' };
+  }
+
+  const normalized = type.toLowerCase();
+  return USER_TYPE_BADGE[normalized] || {
+    color: 'light',
+    label: normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  };
+};
+
+const getCompanyLabel = (user) => {
+  if (!user || typeof user !== 'object') {
+    return '-';
+  }
+
+  const name = user.company_name || user.company?.name;
+  if (name) {
+    return name;
+  }
+
+  if (user.company && typeof user.company === 'object') {
+    const email = user.company.email;
+    if (email) {
+      return email;
+    }
+  }
+
+  if (user.company_id) {
+    return `Company #${user.company_id}`;
+  }
+
+  return '-';
+};
 
 const UserList = () => {
   const navigate = useNavigate();
@@ -257,7 +301,7 @@ const UserList = () => {
                 <CCol md={6}>
                   <CInputGroup>
                     <CFormInput
-                      placeholder="Search by name, email, or username..."
+                  placeholder="Search by name or email..."
                       value={searchTerm}
                       onChange={handleSearch}
                     />
@@ -340,7 +384,8 @@ const UserList = () => {
                     <CTableHeaderCell width="80">ID</CTableHeaderCell>
                     <CTableHeaderCell>Name</CTableHeaderCell>
                     <CTableHeaderCell>Email</CTableHeaderCell>
-                    <CTableHeaderCell>Username</CTableHeaderCell>
+                    <CTableHeaderCell>Company</CTableHeaderCell>
+                    <CTableHeaderCell>User Type</CTableHeaderCell>
                     <CTableHeaderCell>Phone</CTableHeaderCell>
                     <CTableHeaderCell>Status</CTableHeaderCell>
                     <CTableHeaderCell>Created</CTableHeaderCell>
@@ -363,7 +408,17 @@ const UserList = () => {
                           <small>{user.email || '-'}</small>
                         </CTableDataCell>
                         <CTableDataCell>
-                          <small>{user.username || '-'}</small>
+                          <small>{getCompanyLabel(user)}</small>
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          {(() => {
+                            const { color, label } = getUserTypeBadge(user.type);
+                            return (
+                              <CBadge color={color}>
+                                {label}
+                              </CBadge>
+                            );
+                          })()}
                         </CTableDataCell>
                         <CTableDataCell>
                           <small>{formatPhoneNumber(user.phone) || '-'}</small>

@@ -31,8 +31,52 @@ import {
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import { formatDate, formatPhoneNumber } from '../../../utils/formatters';
-import { PERMISSIONS } from '../../../constants/userRoles';
+import { PERMISSIONS, USER_ROLES } from '../../../constants/userRoles';
 import userService from '../services/userService';
+
+const USER_TYPE_BADGE = {
+  admin: { color: 'primary', label: 'Admin' },
+  hr: { color: 'info', label: 'HR' },
+  finance: { color: 'warning', label: 'Finance' },
+  manager: { color: 'secondary', label: 'Manager' },
+  user: { color: 'dark', label: 'Member' }
+};
+
+const getUserTypeBadge = (type) => {
+  if (!type || typeof type !== 'string') {
+    return { color: 'light', label: 'Unknown' };
+  }
+
+  const normalized = type.toLowerCase();
+  return USER_TYPE_BADGE[normalized] || {
+    color: 'light',
+    label: normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  };
+};
+
+const getCompanyLabel = (user) => {
+  if (!user || typeof user !== 'object') {
+    return '-';
+  }
+
+  const name = user.company_name || user.company?.name;
+  if (name) {
+    return name;
+  }
+
+  if (user.company && typeof user.company === 'object') {
+    const email = user.company.email;
+    if (email) {
+      return email;
+    }
+  }
+
+  if (user.company_id) {
+    return `Company #${user.company_id}`;
+  }
+
+  return '-';
+};
 
 const UserDetail = () => {
   const { id } = useParams();
@@ -150,6 +194,14 @@ const UserDetail = () => {
                 </h4>
               </div>
               <div className="d-flex align-items-center gap-2">
+                {(() => {
+                  const { color, label } = getUserTypeBadge(user.type);
+                  return (
+                    <CBadge color={color} className="fs-6">
+                      {label}
+                    </CBadge>
+                  );
+                })()}
                 <CBadge color={user.is_active ? 'success' : 'danger'} className="fs-6">
                   {user.is_active ? (
                     <>
@@ -221,18 +273,23 @@ const UserDetail = () => {
                         <span>{user.email || '-'}</span>
                       </CListGroupItem>
                       <CListGroupItem className="d-flex justify-content-between align-items-center px-0">
-                        <strong>Username</strong>
-                        <span>{user.username || '-'}</span>
+                        <strong>Company</strong>
+                        <span>{getCompanyLabel(user)}</span>
+                      </CListGroupItem>
+                      <CListGroupItem className="d-flex justify-content-between align-items-center px-0">
+                        <strong>User Type</strong>
+                        {(() => {
+                          const { color, label } = getUserTypeBadge(user.type);
+                          return (
+                            <CBadge color={color}>
+                              {label}
+                            </CBadge>
+                          );
+                        })()}
                       </CListGroupItem>
                       <CListGroupItem className="d-flex justify-content-between align-items-center px-0">
                         <strong>Phone</strong>
                         <span>{formatPhoneNumber(user.phone) || '-'}</span>
-                      </CListGroupItem>
-                      <CListGroupItem className="d-flex justify-content-between align-items-center px-0">
-                        <strong>Address</strong>
-                        <span className="text-end">
-                          {user.address || 'No address provided'}
-                        </span>
                       </CListGroupItem>
                       <CListGroupItem className="d-flex justify-content-between align-items-center px-0">
                         <strong>Created At</strong>

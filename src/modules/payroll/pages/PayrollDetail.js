@@ -22,7 +22,7 @@ import {
   CBadge
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilArrowLeft, cilPrint, cilMoney } from '@coreui/icons';
+import { cilArrowLeft, cilPrint, cilMoney, cilCloudDownload } from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import payrollService from '../services/payrollService';
 
@@ -99,6 +99,31 @@ const PayrollDetail = () => {
     }
   };
 
+  const getCompanyLabel = (payrollData) => {
+    if (!payrollData) {
+      return '-';
+    }
+
+    const companyFromEmployee = payrollData.employee?.company;
+    if (companyFromEmployee && typeof companyFromEmployee === 'object') {
+      return companyFromEmployee.name || `Company #${companyFromEmployee.company_id}`;
+    }
+
+    if (payrollData.company && typeof payrollData.company === 'object') {
+      return payrollData.company.name || `Company #${payrollData.company.company_id}`;
+    }
+
+    if (payrollData.company_name) {
+      return payrollData.company_name;
+    }
+
+    if (payrollData.company_id) {
+      return `Company #${payrollData.company_id}`;
+    }
+
+    return '-';
+  };
+
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: '300px' }}>
@@ -142,6 +167,12 @@ const PayrollDetail = () => {
   // Calculate totals
   const totalEarning = earnings.reduce((sum, detail) => sum + (detail.amount || 0), 0);
   const totalDeduction = deductions.reduce((sum, detail) => sum + (detail.amount || 0), 0);
+  const companyLabel = getCompanyLabel(payroll.payroll);
+  const companyEmail =
+    payroll.payroll.employee?.company?.email ||
+    payroll.payroll.company?.email ||
+    '-';
+  const slipUrl = payroll.payroll.slip_url;
 
   return (
     <CRow>
@@ -156,6 +187,20 @@ const PayrollDetail = () => {
                 </small>
               </CCol>
               <CCol xs="auto">
+                {slipUrl && (
+                  <CButton
+                    color="primary"
+                    variant="outline"
+                    className="me-2"
+                    component="a"
+                    href={slipUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <CIcon icon={cilCloudDownload} className="me-1" />
+                    Download Slip
+                  </CButton>
+                )}
                 <CButton color="secondary" variant="outline" className="me-2">
                   <CIcon icon={cilPrint} className="me-1" />
                   Print
@@ -175,9 +220,11 @@ const PayrollDetail = () => {
                 <CCol md={6}>
                   <p className="mb-1"><strong>Name:</strong> {payroll.payroll.employee.name}</p>
                   <p className="mb-1"><strong>NIK:</strong> {payroll.payroll.employee.nik}</p>
+                  <p className="mb-1"><strong>Company:</strong> {companyLabel}</p>
                 </CCol>
                 <CCol md={6}>
                   <p className="mb-1"><strong>Email:</strong> {payroll.payroll.employee.email}</p>
+                  <p className="mb-1"><strong>Company Email:</strong> {companyEmail}</p>
                   <p className="mb-1"><strong>Status:</strong> {getStatusBadge(payroll.payroll.is_printed, payroll.payroll.is_emailed)}</p>
                 </CCol>
               </CRow>

@@ -37,7 +37,7 @@ import {
   CToastHeader
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilPlus, cilTrash, cilPrint, cilMoney, cilSearch, cilFilter } from '@coreui/icons';
+import { cilPlus, cilTrash, cilPrint, cilMoney, cilSearch, cilFilter, cilCloudDownload, cilViewModule, cilLoopCircular } from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import payrollService from '../services/payrollService';
 import employeeService from '../../employees/services/employeeService';
@@ -107,6 +107,16 @@ const PayrollList = () => {
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [employeeSearchResults, setEmployeeSearchResults] = useState([]);
   const [searchingEmployees, setSearchingEmployees] = useState(false);
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [regenerateTarget, setRegenerateTarget] = useState(null);
+  const [regeneratePeriod, setRegeneratePeriod] = useState('');
+  const [regenerateError, setRegenerateError] = useState('');
+  const [regenerating, setRegenerating] = useState(false);
+  const [showRowPayrollModal, setShowRowPayrollModal] = useState(false);
+  const [rowPayrollTarget, setRowPayrollTarget] = useState(null);
+  const [rowPayrollPeriod, setRowPayrollPeriod] = useState('');
+  const [rowPayrollError, setRowPayrollError] = useState('');
+  const [rowGeneratingPayroll, setRowGeneratingPayroll] = useState(false);
   
   // Toast Notification State
   const [toast, setToast] = useState({
@@ -114,6 +124,31 @@ const PayrollList = () => {
     message: '',
     color: 'success' // success, danger, warning, info
   });
+
+  const getCompanyLabel = (payroll) => {
+    if (!payroll || typeof payroll !== 'object') {
+      return '-';
+    }
+
+    const companyFromEmployee = payroll.employee?.company;
+    if (companyFromEmployee && typeof companyFromEmployee === 'object') {
+      return companyFromEmployee.name || `Company #${companyFromEmployee.company_id}`;
+    }
+
+    if (payroll.company && typeof payroll.company === 'object') {
+      return payroll.company.name || `Company #${payroll.company.company_id}`;
+    }
+
+    if (payroll.company_name) {
+      return payroll.company_name;
+    }
+
+    if (payroll.company_id) {
+      return `Company #${payroll.company_id}`;
+    }
+
+    return '-';
+  };
 
   useDocumentTitle('Payroll List');
 
@@ -305,8 +340,36 @@ const PayrollList = () => {
     setEmployeeSearchResults([]);
   };
 
+  const openRegenerateModal = (payroll) => {
+    setRegenerateTarget(payroll);
+    setRegeneratePeriod(String(payroll.payroll_periode || '').trim());
+    setRegenerateError('');
+    setShowRegenerateModal(true);
+  };
+
+  const closeRegenerateModal = () => {
+    setShowRegenerateModal(false);
+    setRegenerateTarget(null);
+    setRegeneratePeriod('');
+    setRegenerateError('');
+  };
+
+  const openRowPayrollModal = (payroll) => {
+    setRowPayrollTarget(payroll);
+    setRowPayrollPeriod(String(payroll.payroll_periode || '').trim());
+    setRowPayrollError('');
+    setShowRowPayrollModal(true);
+  };
+
+  const closeRowPayrollModal = () => {
+    setShowRowPayrollModal(false);
+    setRowPayrollTarget(null);
+    setRowPayrollPeriod('');
+    setRowPayrollError('');
+  };
+
   // Generate payroll
-  const generatePayroll = async (e) => {
+const generatePayroll = async (e) => {
     e.preventDefault();
     
     if (!selectedEmployee) {
@@ -324,19 +387,19 @@ const PayrollList = () => {
       setPayrollError('');
       
       // Call the payroll service to generate the payroll
-      await payrollService.generatePayroll(selectedEmployee.employee_id, payrollPeriod);
-      
-      // Close modal
-      setShowGeneratePayrollModal(false);
-      setSelectedEmployee(null);
-      setPayrollPeriod('');
-      
-      // Show success toast
-      showToast('Payroll generated successfully', 'success');
-      
-      // Refresh the payroll list
-      await loadPayrolls();
-      
+     await payrollService.generatePayroll(selectedEmployee.employee_id, payrollPeriod);
+     
+     // Close modal
+     setShowGeneratePayrollModal(false);
+     setSelectedEmployee(null);
+     setPayrollPeriod('');
+     
+     // Show success toast
+     showToast('Payroll generated successfully', 'success');
+     
+     // Refresh the payroll list
+     await loadPayrolls();
+     
     } catch (error) {
       console.error('Error generating payroll:', error);
       setPayrollError(error.message || 'Failed to generate payroll');
@@ -344,6 +407,90 @@ const PayrollList = () => {
       showToast(error.message || 'Failed to generate payroll', 'danger');
     } finally {
       setGeneratingPayroll(false);
+    }
+  };
+
+  const handleGenerateSlip = async () => {
+    if (!regenerateTarget || !regenerateTarget.employee_id) {
+      setRegenerateError('Invalid payroll selected.');
+      return;
+    }
+
+    if (!regeneratePeriod.trim()) {
+      setRegenerateError('Payroll period is required.');
+      return;
+    }
+
+    try {
+      setRegenerating(true);
+      setRegenerateError('');
+
+      const response = await payrollService.generateSlip(
+        regenerateTarget.employee_id,
+        regeneratePeriod.trim()
+      );
+
+      const slipUrl =
+        response?.data?.payroll?.slip_url ||
+        response?.payroll?.slip_url ||
+        null;
+
+      showToast(
+        slipUrl
+          ? 'Slip generated successfully. Download icon updated.'
+          : 'Slip generated successfully.',
+        'success'
+      );
+
+      closeRegenerateModal();
+      await loadPayrolls();
+    } catch (error) {
+      console.error('Error generating slip:', error);
+      setRegenerateError(error.message || 'Failed to generate slip.');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const handleRowPayrollGenerate = async () => {
+    if (!rowPayrollTarget || !rowPayrollTarget.employee_id) {
+      setRowPayrollError('Invalid payroll selected.');
+      return;
+    }
+
+    if (!rowPayrollPeriod.trim()) {
+      setRowPayrollError('Payroll period is required.');
+      return;
+    }
+
+    try {
+      setRowGeneratingPayroll(true);
+      setRowPayrollError('');
+
+      const response = await payrollService.generatePayroll(
+        rowPayrollTarget.employee_id,
+        rowPayrollPeriod.trim()
+      );
+
+      const slipUrl =
+        response?.data?.payroll?.slip_url ||
+        response?.payroll?.slip_url ||
+        null;
+
+      showToast(
+        slipUrl
+          ? 'Payroll generated successfully. Download icon updated.'
+          : 'Payroll generated successfully.',
+        'success'
+      );
+
+      closeRowPayrollModal();
+      await loadPayrolls();
+    } catch (error) {
+      console.error('Error generating payroll:', error);
+      setRowPayrollError(error.message || 'Failed to generate payroll.');
+    } finally {
+      setRowGeneratingPayroll(false);
     }
   };
 
@@ -515,10 +662,10 @@ const PayrollList = () => {
                     <CTableHead>
                       <CTableRow>
                         <CTableHeaderCell>Employee</CTableHeaderCell>
+                        <CTableHeaderCell>Company</CTableHeaderCell>
                         <CTableHeaderCell>Period</CTableHeaderCell>
                         <CTableHeaderCell>Net Pay</CTableHeaderCell>
                         <CTableHeaderCell>Status</CTableHeaderCell>
-                        <CTableHeaderCell>Created At</CTableHeaderCell>
                         <CTableHeaderCell>Actions</CTableHeaderCell>
                       </CTableRow>
                     </CTableHead>
@@ -531,6 +678,19 @@ const PayrollList = () => {
                               <div className="small text-medium-emphasis">
                                 {payroll.employee?.nik || 'No NIK'}
                               </div>
+                              <div className="small text-medium-emphasis">
+                                {payroll.employee?.email || 'No email'}
+                              </div>
+                            </div>
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            <div>
+                              <strong>{getCompanyLabel(payroll)}</strong>
+                              {payroll.employee?.company?.email && (
+                                <div className="small text-medium-emphasis">
+                                  {payroll.employee.company.email}
+                                </div>
+                              )}
                             </div>
                           </CTableDataCell>
                           <CTableDataCell>
@@ -547,22 +707,83 @@ const PayrollList = () => {
                               {payroll.is_emailed ? 'Emailed' : 'Not Emailed'}
                             </CBadge>
                           </CTableDataCell>
-                          <CTableDataCell>
-                            {formatDate(payroll.created_at)}
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            <Link to={`/payroll/${payroll.payroll_id}`}>
-                              <CButton color="info" size="sm" className="me-1">
-                                <CIcon icon={cilMoney} size="sm" />
+                        <CTableDataCell>
+                          <Link to={`/payroll/${payroll.payroll_id}`}>
+                            <CButton
+                              color="info"
+                              size="sm"
+                              className="me-1"
+                              title="View Payroll Detail"
+                            >
+                              <CIcon icon={cilViewModule} size="sm" />
+                            </CButton>
+                          </Link>
+                          <CButton
+                            color="primary"
+                            size="sm"
+                            className="me-1"
+                            title="Generate Payroll"
+                            onClick={() => openRowPayrollModal(payroll)}
+                          >
+                            <CIcon icon={cilMoney} size="sm" />
+                          </CButton>
+                          <CButton
+                            color="primary"
+                            size="sm"
+                            className="me-1"
+                            title="Generate Slip"
+                            onClick={() => openRegenerateModal(payroll)}
+                          >
+                            <CIcon icon={cilLoopCircular} size="sm" />
+                          </CButton>
+                          {payroll.slip_url ? (
+                          <CButton
+                            color="primary"
+                            size="sm"
+                            className="me-1"
+                                title="Download Slip"
+                                component="a"
+                                href={payroll.slip_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <CIcon icon={cilCloudDownload} size="sm" />
                               </CButton>
-                            </Link>
-                            <CButton color="success" size="sm" className="me-1" disabled={!payroll.is_printed}>
+                            ) : (
+                              <CButton
+                                color="primary"
+                                size="sm"
+                                className="me-1"
+                                title="Download Slip"
+                                disabled
+                              >
+                                <CIcon icon={cilCloudDownload} size="sm" />
+                              </CButton>
+                            )}
+                            <CButton
+                              color="success"
+                              size="sm"
+                              className="me-1"
+                              title="Print Slip"
+                              disabled={!payroll.is_printed}
+                            >
                               <CIcon icon={cilPrint} size="sm" />
                             </CButton>
-                            <CButton color="warning" size="sm" className="me-1" disabled={!payroll.is_emailed}>
+                            <CButton
+                              color="warning"
+                              size="sm"
+                              className="me-1"
+                              title="Email Slip"
+                              disabled={!payroll.is_emailed}
+                            >
                               <CIcon icon={cilMoney} size="sm" />
                             </CButton>
-                            <CButton color="danger" size="sm" disabled>
+                            <CButton
+                              color="danger"
+                              size="sm"
+                              title="Delete Payroll (disabled)"
+                              disabled
+                            >
                               <CIcon icon={cilTrash} size="sm" />
                             </CButton>
                           </CTableDataCell>
@@ -766,6 +987,142 @@ const PayrollList = () => {
               </>
             ) : (
               'Generate Payroll'
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+      
+      {/* Generate Payroll (Row) Modal */}
+      <CModal
+        visible={showRowPayrollModal}
+        onClose={closeRowPayrollModal}
+      >
+        <CModalHeader>
+          <CModalTitle>Generate Payroll</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {rowPayrollError && (
+            <CAlert color="danger" className="mb-3">
+              {rowPayrollError}
+            </CAlert>
+          )}
+
+          <div className="mb-3">
+            <label className="form-label">Employee</label>
+            <CFormInput
+              type="text"
+              value={
+                rowPayrollTarget
+                  ? `${rowPayrollTarget.employee?.name || '-'} (${rowPayrollTarget.employee?.nik || '-'})`
+                  : ''
+              }
+              disabled
+              readOnly
+            />
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label">Payroll Period</label>
+            <CFormInput
+              type="text"
+              placeholder="Enter period (e.g., 202501)"
+              value={rowPayrollPeriod}
+              onChange={(e) => setRowPayrollPeriod(e.target.value)}
+              disabled={rowGeneratingPayroll}
+            />
+            <small className="text-muted">
+              Format: YYYYMM (e.g., 202501 for January 2025)
+            </small>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={closeRowPayrollModal}
+            disabled={rowGeneratingPayroll}
+          >
+            Cancel
+          </CButton>
+          <CButton
+            color="primary"
+            onClick={handleRowPayrollGenerate}
+            disabled={rowGeneratingPayroll}
+          >
+            {rowGeneratingPayroll ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Generating...
+              </>
+            ) : (
+              'Generate Payroll'
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+      
+      {/* Generate Slip Modal */}
+      <CModal
+        visible={showRegenerateModal}
+        onClose={closeRegenerateModal}
+      >
+        <CModalHeader>
+          <CModalTitle>Generate Slip</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {regenerateError && (
+            <CAlert color="danger" className="mb-3">
+              {regenerateError}
+            </CAlert>
+          )}
+
+          <div className="mb-3">
+            <label className="form-label">Employee</label>
+            <CFormInput
+              type="text"
+              value={
+                regenerateTarget
+                  ? `${regenerateTarget.employee?.name || '-'} (${regenerateTarget.employee?.nik || '-'})`
+                  : ''
+              }
+              disabled
+              readOnly
+            />
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label">Payroll Period</label>
+            <CFormInput
+              type="text"
+              placeholder="Enter period (e.g., 202501)"
+              value={regeneratePeriod}
+              onChange={(e) => setRegeneratePeriod(e.target.value)}
+              disabled={regenerating}
+            />
+            <small className="text-muted">
+              Format: YYYYMM (e.g., 202501 for January 2025)
+            </small>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={closeRegenerateModal}
+            disabled={regenerating}
+          >
+            Cancel
+          </CButton>
+          <CButton
+            color="primary"
+            onClick={handleGenerateSlip}
+            disabled={regenerating}
+          >
+            {regenerating ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Generating...
+              </>
+            ) : (
+              'Generate Slip'
             )}
           </CButton>
         </CModalFooter>

@@ -70,6 +70,7 @@ export const API_ENDPOINTS = {
     LIST: `${API_BASE}/payroll`,
     DETAIL: (id) => `${API_BASE}/payroll/${id}`,
     GENERATE: `${API_BASE}/payroll/generate`,
+    GENERATE_SLIP: `${API_BASE}/payroll/slip`,
     MASS_GENERATE: `${API_BASE}/payroll/mass`,
     UPDATE: (id) => `${API_BASE}/payroll/${id}`,
     MARK_PRINTED: (id) => `${API_BASE}/payroll/${id}/print`,

@@ -82,6 +82,20 @@ class PayrollService {
     }
   }
 
+  // Generate slip for an employee
+  async generateSlip(employeeId, payrollPeriod) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.GENERATE_SLIP, {
+        employee_id: employeeId,
+        payroll_periode: payrollPeriod
+      });
+      return response.data || response;
+    } catch (error) {
+      console.error('Error generating slip:', error);
+      throw this.handleError(error);
+    }
+  }
+
   // Generate mass payroll for all employees
   async generateMassPayroll(payrollPeriod) {
     try {

@@ -109,6 +109,60 @@ class PayrollService {
     }
   }
 
+  // Generate mass slip for all employees
+  async generateMassSlip(payrollPeriod) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.MASS_GENERATE_SLIP, {
+        payroll_periode: payrollPeriod
+      });
+      return response.data || response;
+    } catch (error) {
+      console.error('Error generating mass slip:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  // Email payroll slip to employee
+  async emailSlip(employeeId, payrollPeriod) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.EMAIL_SLIP, {
+        employee_id: employeeId,
+        payroll_periode: payrollPeriod
+      });
+      return response.data || response;
+    } catch (error) {
+      console.error('Error emailing slip:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  // Email payroll slips for a company
+  async emailMassSlip(companyId, payrollPeriod) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.EMAIL_SLIP_MASS, {
+        company_id: companyId,
+        payroll_periode: payrollPeriod
+      });
+      return response.data || response;
+    } catch (error) {
+      console.error('Error emailing mass slips:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  // Download payroll file for a period
+  async downloadPayroll(periode, companyId) {
+    try {
+      const baseUrl = API_ENDPOINTS.PAYROLL.DOWNLOAD(periode);
+      const url = companyId ? `${baseUrl}?company_id=${companyId}` : baseUrl;
+      const response = await apiClient.get(url);
+      return response;
+    } catch (error) {
+      console.error('Error downloading payroll:', error);
+      throw this.handleError(error);
+    }
+  }
+
   // Get payroll by ID
   async getPayrollById(id) {
     try {
@@ -183,3 +237,4 @@ class PayrollService {
 const payrollService = new PayrollService();
 
 export default payrollService;
+

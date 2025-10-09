@@ -71,7 +71,12 @@ export const API_ENDPOINTS = {
     DETAIL: (id) => `${API_BASE}/payroll/${id}`,
     GENERATE: `${API_BASE}/payroll/generate`,
     GENERATE_SLIP: `${API_BASE}/payroll/slip`,
-    MASS_GENERATE: `${API_BASE}/payroll/mass`,
+    MASS_GENERATE: `${API_BASE}/payroll/generate-mas`,
+    MASS_GENERATE_SLIP: `${API_BASE}/payroll/slip/mass`,
+    EMAIL_SLIP: `${API_BASE}/payroll/slip/email`,
+    EMAIL_SLIP_MASS: `${API_BASE}/payroll/slip/email/mass`,
+    DOWNLOAD: (periode) => `${API_BASE}/payroll/download/${periode}`,
+    DOWNLOAD_FILE: `${API_BASE}/payroll/download/file`,
     UPDATE: (id) => `${API_BASE}/payroll/${id}`,
     MARK_PRINTED: (id) => `${API_BASE}/payroll/${id}/print`,
     DELETE: (id) => `${API_BASE}/payroll/${id}`

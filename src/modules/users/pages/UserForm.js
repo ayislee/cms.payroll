@@ -62,9 +62,7 @@ const UserForm = () => {
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
   const [passwordForm, setPasswordForm] = useState({
-    current_password: '',
     new_password: '',
-    new_password_confirmation: '',
     confirm_password: ''
   });
   const [passwordErrors, setPasswordErrors] = useState({});
@@ -181,14 +179,8 @@ const UserForm = () => {
 
   const validatePasswordForm = () => {
     const errors = {};
-    const trimmedCurrent = passwordForm.current_password?.trim() || '';
-    const trimmedNew = passwordForm.new_password || '';
-    const trimmedConfirm = passwordForm.new_password_confirmation || '';
-    const trimmedFinalConfirm = passwordForm.confirm_password || '';
-
-    if (!trimmedCurrent) {
-      errors.current_password = 'Current password is required.';
-    }
+    const trimmedNew = passwordForm.new_password?.trim() || '';
+    const trimmedConfirm = passwordForm.confirm_password?.trim() || '';
 
     if (!trimmedNew) {
       errors.new_password = 'New password is required.';
@@ -197,14 +189,8 @@ const UserForm = () => {
     }
 
     if (!trimmedConfirm) {
-      errors.new_password_confirmation = 'Please confirm the new password.';
+      errors.confirm_password = 'Please confirm the new password.';
     } else if (trimmedNew !== trimmedConfirm) {
-      errors.new_password_confirmation = 'Password confirmation does not match.';
-    }
-
-    if (!trimmedFinalConfirm) {
-      errors.confirm_password = 'Please re-enter the new password.';
-    } else if (trimmedNew !== trimmedFinalConfirm) {
       errors.confirm_password = 'New password and confirmation must match.';
     }
 
@@ -275,17 +261,13 @@ const UserForm = () => {
     try {
       setChangingPassword(true);
       await userService.changePassword(id, {
-        current_password: passwordForm.current_password,
         new_password: passwordForm.new_password,
-        new_password_confirmation: passwordForm.new_password_confirmation,
         confirm_password: passwordForm.confirm_password
       });
 
       setPasswordSuccess('Password updated successfully.');
       setPasswordForm({
-        current_password: '',
         new_password: '',
-        new_password_confirmation: '',
         confirm_password: ''
       });
       setPasswordErrors({});
@@ -543,30 +525,11 @@ const UserForm = () => {
                           </CAlert>
                         )}
 
-                        <div className="mb-3">
-                          <CFormLabel htmlFor="current_password">
-                            Current Password <span className="text-danger">*</span>
-                          </CFormLabel>
-                          <CFormInput
-                            type="password"
-                            id="current_password"
-                            name="current_password"
-                            value={passwordForm.current_password}
-                            onChange={handlePasswordInputChange}
-                            disabled={changingPassword}
-                            invalid={!!passwordErrors.current_password}
-                            autoComplete="current-password"
-                          />
-                          {passwordErrors.current_password && (
-                            <small className="text-danger">{passwordErrors.current_password}</small>
-                          )}
-                        </div>
-
-                        <div className="mb-3">
-                          <CFormLabel htmlFor="new_password">
-                            New Password <span className="text-danger">*</span>
-                          </CFormLabel>
-                          <CFormInput
+                          <div className="mb-3">
+                            <CFormLabel htmlFor="new_password">
+                              New Password <span className="text-danger">*</span>
+                            </CFormLabel>
+                            <CFormInput
                             type="password"
                             id="new_password"
                             name="new_password"
@@ -578,36 +541,17 @@ const UserForm = () => {
                           />
                           {passwordErrors.new_password && (
                             <small className="text-danger">{passwordErrors.new_password}</small>
-                          )}
-                        </div>
+                            )}
+                          </div>
 
-                        <div className="mb-3">
-                          <CFormLabel htmlFor="new_password_confirmation">
-                            Confirm New Password <span className="text-danger">*</span>
-                          </CFormLabel>
-                          <CFormInput
-                            type="password"
-                            id="new_password_confirmation"
-                            name="new_password_confirmation"
-                            value={passwordForm.new_password_confirmation}
-                            onChange={handlePasswordInputChange}
-                            disabled={changingPassword}
-                            invalid={!!passwordErrors.new_password_confirmation}
-                            autoComplete="new-password"
-                          />
-                          {passwordErrors.new_password_confirmation && (
-                            <small className="text-danger">{passwordErrors.new_password_confirmation}</small>
-                          )}
-                        </div>
-
-                        <div className="mb-3">
-                          <CFormLabel htmlFor="confirm_password">
-                            Re-enter New Password <span className="text-danger">*</span>
-                          </CFormLabel>
-                          <CFormInput
-                            type="password"
-                            id="confirm_password"
-                            name="confirm_password"
+                          <div className="mb-3">
+                            <CFormLabel htmlFor="confirm_password">
+                              Confirm Password <span className="text-danger">*</span>
+                            </CFormLabel>
+                            <CFormInput
+                              type="password"
+                              id="confirm_password"
+                              name="confirm_password"
                             value={passwordForm.confirm_password}
                             onChange={handlePasswordInputChange}
                             disabled={changingPassword}

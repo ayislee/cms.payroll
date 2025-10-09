@@ -37,10 +37,12 @@ import {
   CToastHeader
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilPlus, cilTrash, cilPrint, cilMoney, cilSearch, cilFilter, cilCloudDownload, cilViewModule, cilLoopCircular } from '@coreui/icons';
+import { cilPlus, cilTrash, cilPrint, cilMoney, cilSearch, cilFilter, cilCloudDownload, cilViewModule, cilLoopCircular, cilEnvelopeClosed } from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import payrollService from '../services/payrollService';
 import employeeService from '../../employees/services/employeeService';
+import companyService from '../../companies/services/companyService';
+import config from '../../../config/environment';
 
 console.log('PayrollService imported:', payrollService);
 
@@ -90,7 +92,7 @@ const PayrollList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [pageSize, setPageSize] = useState(5); // Default to 5 as per requirements
+  const [pageSize, setPageSize] = useState(15); // Default to 15 rows per page
   const [searchParams, setSearchParams] = useState({
     search: '',
     payroll_periode: '',
@@ -494,6 +496,388 @@ const generatePayroll = async (e) => {
     }
   };
 
+  const [showMassGenerateModal, setShowMassGenerateModal] = useState(false);
+  const [massPayrollPeriod, setMassPayrollPeriod] = useState('');
+  const [massGenerateError, setMassGenerateError] = useState('');
+  const [massGenerating, setMassGenerating] = useState(false);
+  const [showMassSlipModal, setShowMassSlipModal] = useState(false);
+  const [massSlipPeriod, setMassSlipPeriod] = useState('');
+  const [massSlipError, setMassSlipError] = useState('');
+  const [massSlipGenerating, setMassSlipGenerating] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadPeriod, setDownloadPeriod] = useState('');
+  const [downloadCompanyId, setDownloadCompanyId] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const [downloadCompanies, setDownloadCompanies] = useState([]);
+  const [showMassEmailModal, setShowMassEmailModal] = useState(false);
+  const [massEmailCompanyId, setMassEmailCompanyId] = useState('');
+  const [massEmailPeriod, setMassEmailPeriod] = useState('');
+  const [massEmailError, setMassEmailError] = useState('');
+  const [massEmailSending, setMassEmailSending] = useState(false);
+  const [massEmailConfirmPayload, setMassEmailConfirmPayload] = useState(null);
+  const [emailingSlipId, setEmailingSlipId] = useState(null);
+  const [emailConfirmTarget, setEmailConfirmTarget] = useState(null);
+
+  const openMassGenerateModal = () => {
+    setMassPayrollPeriod('');
+    setMassGenerateError('');
+    setShowMassGenerateModal(true);
+  };
+
+  const closeMassGenerateModal = () => {
+    setShowMassGenerateModal(false);
+    setMassPayrollPeriod('');
+    setMassGenerateError('');
+  };
+
+  const openMassSlipModal = () => {
+    setMassSlipPeriod('');
+    setMassSlipError('');
+    setShowMassSlipModal(true);
+  };
+
+  const closeMassSlipModal = () => {
+    setShowMassSlipModal(false);
+    setMassSlipPeriod('');
+    setMassSlipError('');
+  };
+
+  const handleMassPayrollGenerate = async () => {
+    if (!massPayrollPeriod.trim()) {
+      setMassGenerateError('Payroll period is required.');
+      return;
+    }
+
+    try {
+      setMassGenerating(true);
+      setMassGenerateError('');
+
+      await payrollService.generateMassPayroll(massPayrollPeriod.trim());
+
+      showToast('Mass payroll generation started successfully.', 'success');
+      closeMassGenerateModal();
+      await loadPayrolls();
+    } catch (error) {
+      console.error('Error generating mass payroll:', error);
+      setMassGenerateError(error.message || 'Failed to generate mass payroll.');
+    } finally {
+      setMassGenerating(false);
+    }
+  };
+
+  const openDownloadModal = () => {
+    setDownloadPeriod("");
+    setDownloadError("");
+    setShowDownloadModal(true);
+
+    if (downloadCompanies.length > 0) {
+      setDownloadCompanyId(String(downloadCompanies[0].value));
+    } else {
+      setDownloadCompanyId("");
+    }
+  };
+
+  const closeDownloadModal = () => {
+    setShowDownloadModal(false);
+    setDownloadPeriod("");
+    setDownloadCompanyId("");
+    setDownloadError("");
+  };
+
+  const extractFilename = (response, fallbackName) => {
+    const contentDisposition = response.headers?.get
+      ? response.headers.get('content-disposition')
+      : null;
+
+    if (!contentDisposition) {
+      return fallbackName;
+    }
+
+    const filenameMatch = contentDisposition
+      .split(';')
+      .map(part => part.trim())
+      .find(part => part.toLowerCase().startsWith('filename'));
+
+    if (!filenameMatch) {
+      return fallbackName;
+    }
+
+    const [, value] = filenameMatch.split('=');
+    if (!value) {
+      return fallbackName;
+    }
+
+    return decodeURIComponent(value.replace(/(^"|"$)/g, '')) || fallbackName;
+  };
+
+  const downloadFileWithAuth = async (url, fallbackFileName) => {
+    const token = localStorage.getItem(config.auth.tokenStorageKey);
+
+    if (!token) {
+      throw new Error('Authentication token not found. Please login again.');
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch payroll file.');
+    }
+
+    const blob = await response.blob();
+    const filename = extractFilename(response, fallbackFileName);
+
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  };
+
+  const handlePayrollDownload = async () => {
+    if (!downloadPeriod.trim()) {
+      setDownloadError("Payroll period is required.");
+      return;
+    }
+
+    if (!downloadCompanyId.trim()) {
+      setDownloadError("Company ID is required.");
+      return;
+    }
+
+    const companyIdNumeric = Number(downloadCompanyId);
+    if (Number.isNaN(companyIdNumeric) || companyIdNumeric <= 0) {
+      setDownloadError("Company ID must be a positive number.");
+      return;
+    }
+
+    try {
+      setDownloading(true);
+      setDownloadError("");
+
+      const responseData = await payrollService.downloadPayroll(
+        downloadPeriod.trim(),
+        companyIdNumeric
+      );
+
+      const payload = responseData?.data ? responseData.data : responseData;
+      const downloadUrl = payload?.download_url || null;
+      const fallbackName =
+        payload?.file_name ||
+        `payroll-${downloadPeriod.trim()}.xlsx`;
+
+      if (!downloadUrl) {
+        showToast("Payroll file generation triggered.", "success");
+        closeDownloadModal();
+        return;
+      }
+
+      try {
+        await downloadFileWithAuth(downloadUrl, fallbackName);
+        showToast("Payroll file downloaded successfully.", "success");
+      } catch (downloadErr) {
+        console.error("Error fetching payroll file:", downloadErr);
+        setDownloadError(downloadErr.message || "Failed to download payroll file.");
+        return;
+      }
+
+      closeDownloadModal();
+    } catch (error) {
+      console.error("Error downloading payroll:", error);
+      setDownloadError(error.message || "Failed to download payroll.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+  useEffect(() => {
+    const fetchDownloadCompanies = async () => {
+      try {
+        const options = await companyService.getCompanyOptions();
+        setDownloadCompanies(options || []);
+      } catch (err) {
+        console.error('Error loading companies for download:', err);
+      }
+    };
+
+    fetchDownloadCompanies();
+  }, []);
+  useEffect(() => {
+    if (showDownloadModal && !downloadCompanyId && downloadCompanies.length > 0) {
+      setDownloadCompanyId(String(downloadCompanies[0].value));
+    }
+  }, [showDownloadModal, downloadCompanyId, downloadCompanies]);
+  useEffect(() => {
+    if (showMassEmailModal && !massEmailCompanyId && downloadCompanies.length > 0) {
+      setMassEmailCompanyId(String(downloadCompanies[0].value));
+    }
+  }, [showMassEmailModal, massEmailCompanyId, downloadCompanies]);
+
+  const handleMassSlipGenerate = async () => {
+    if (!massSlipPeriod.trim()) {
+      setMassSlipError('Payroll period is required.');
+      return;
+    }
+
+    try {
+      setMassSlipGenerating(true);
+      setMassSlipError('');
+
+      await payrollService.generateMassSlip(massSlipPeriod.trim());
+
+      showToast('Mass slip generation started successfully.', 'success');
+      closeMassSlipModal();
+      await loadPayrolls();
+    } catch (error) {
+      console.error('Error generating mass slip:', error);
+      setMassSlipError(error.message || 'Failed to generate mass slip.');
+    } finally {
+      setMassSlipGenerating(false);
+    }
+  };
+
+  const openMassEmailModal = () => {
+    setMassEmailPeriod('');
+    setMassEmailError('');
+    if (downloadCompanies.length > 0) {
+      setMassEmailCompanyId(String(downloadCompanies[0].value));
+    } else {
+      setMassEmailCompanyId('');
+    }
+    setShowMassEmailModal(true);
+  };
+
+  const closeMassEmailModal = () => {
+    if (massEmailSending) {
+      return;
+    }
+    setShowMassEmailModal(false);
+    setMassEmailPeriod('');
+    setMassEmailCompanyId('');
+    setMassEmailError('');
+    setMassEmailConfirmPayload(null);
+  };
+
+  const handleMassEmailPrepare = (event) => {
+    if (event) {
+      event.preventDefault();
+    }
+
+    if (massEmailSending) {
+      return;
+    }
+
+    if (!massEmailPeriod.trim()) {
+      setMassEmailError('Payroll period is required.');
+      return;
+    }
+
+    if (downloadCompanies.length === 0) {
+      setMassEmailError('No companies available for mass email.');
+      return;
+    }
+
+    if (!massEmailCompanyId) {
+      setMassEmailError('Company is required.');
+      return;
+    }
+
+    const companyIdNumeric = Number(massEmailCompanyId);
+    if (Number.isNaN(companyIdNumeric) || companyIdNumeric <= 0) {
+      setMassEmailError('Company ID must be a positive number.');
+      return;
+    }
+
+    setMassEmailError('');
+    setMassEmailConfirmPayload({
+      companyId: companyIdNumeric,
+      period: massEmailPeriod.trim()
+    });
+    setShowMassEmailModal(false);
+  };
+
+  const cancelMassEmailConfirm = () => {
+    if (massEmailSending) {
+      return;
+    }
+    setMassEmailConfirmPayload(null);
+    setShowMassEmailModal(true);
+  };
+
+  const handleMassEmailConfirm = async () => {
+    if (!massEmailConfirmPayload) {
+      return;
+    }
+
+    const { companyId, period } = massEmailConfirmPayload;
+
+    try {
+      setMassEmailSending(true);
+      await payrollService.emailMassSlip(companyId, period);
+      showToast('Mass slip emails sent successfully.', 'success');
+      setMassEmailConfirmPayload(null);
+      setShowMassEmailModal(false);
+      setMassEmailPeriod('');
+      setMassEmailCompanyId('');
+      setMassEmailError('');
+      await loadPayrolls();
+    } catch (error) {
+      console.error('Error emailing mass slips:', error);
+      showToast(error.message || 'Failed to send mass slip emails.', 'danger');
+    } finally {
+      setMassEmailSending(false);
+    }
+  };
+
+  const getCompanyOptionLabel = (value) => {
+    if (!value) {
+      return 'Selected company';
+    }
+    const option = downloadCompanies.find(
+      (company) => String(company.value) === String(value)
+    );
+    return option?.label || `Company #${value}`;
+  };
+
+  const confirmEmailSlip = (payroll) => {
+    setEmailConfirmTarget(payroll);
+  };
+
+  const handleEmailSlip = async () => {
+    const payroll = emailConfirmTarget;
+    if (!payroll?.employee_id) {
+      showToast('Invalid employee data for slip email.', 'danger');
+      setEmailConfirmTarget(null);
+      return;
+    }
+
+    const period = String(payroll?.payroll_periode || '').trim();
+    if (!period) {
+      showToast('Payroll period not found for this record.', 'danger');
+      setEmailConfirmTarget(null);
+      return;
+    }
+
+    try {
+      setEmailingSlipId(payroll.payroll_id);
+      await payrollService.emailSlip(payroll.employee_id, period);
+      showToast('Slip email sent successfully.', 'success');
+      await loadPayrolls();
+    } catch (error) {
+      console.error('Error emailing slip:', error);
+      showToast(error.message || 'Failed to send slip email.', 'danger');
+    } finally {
+      setEmailConfirmTarget(null);
+      setEmailingSlipId(null);
+    }
+  };
+
   // Show toast notification
   const showToast = (message, color = 'success') => {
     setToast({
@@ -581,10 +965,34 @@ const generatePayroll = async (e) => {
                   </CButton>
                   <CButton 
                     color="info"
-                    onClick={() => console.log('Generate Mass clicked')}
+                    onClick={openMassGenerateModal}
+                    className="me-2"
                   >
                     <CIcon icon={cilPlus} className="me-1" />
-                    Generate Mass
+                    Generate Mass Payroll
+                  </CButton>
+                  <CButton 
+                    color="success"
+                    onClick={openMassSlipModal}
+                    className="me-2"
+                  >
+                    <CIcon icon={cilPlus} className="me-1" />
+                    Generate Mass Slip
+                  </CButton>
+                  <CButton 
+                    color="warning"
+                    onClick={openMassEmailModal}
+                    className="me-2"
+                  >
+                    <CIcon icon={cilEnvelopeClosed} className="me-1" />
+                    Send Mass Email
+                  </CButton>
+                  <CButton 
+                    color="dark"
+                    onClick={openDownloadModal}
+                  >
+                    <CIcon icon={cilCloudDownload} className="me-1" />
+                    Download Payroll
                   </CButton>
                 </CCol>
               </CRow>
@@ -774,9 +1182,18 @@ const generatePayroll = async (e) => {
                               size="sm"
                               className="me-1"
                               title="Email Slip"
-                              disabled={!payroll.is_emailed}
+                              disabled={
+                                !payroll.is_printed ||
+                                !payroll.slip_url ||
+                                emailingSlipId === payroll.payroll_id
+                              }
+                              onClick={() => confirmEmailSlip(payroll)}
                             >
-                              <CIcon icon={cilMoney} size="sm" />
+                              {emailingSlipId === payroll.payroll_id ? (
+                                <CSpinner size="sm" />
+                              ) : (
+                                <CIcon icon={cilEnvelopeClosed} size="sm" />
+                              )}
                             </CButton>
                             <CButton
                               color="danger"
@@ -805,8 +1222,7 @@ const generatePayroll = async (e) => {
                           onChange={(e) => handlePageSizeChange(Number(e.target.value))}
                           style={{ width: 'auto' }}
                         >
-                          <option value="5">5</option>
-                          <option value="10">10</option>
+                          <option value="15">15</option>
                           <option value="25">25</option>
                           <option value="50">50</option>
                           <option value="100">100</option>
@@ -1060,7 +1476,231 @@ const generatePayroll = async (e) => {
         </CModalFooter>
       </CModal>
       
-      {/* Generate Slip Modal */}
+      {/* Generate Mass Payroll Modal */}
+      <CModal
+        visible={showMassGenerateModal}
+        onClose={closeMassGenerateModal}
+      >
+        <CModalHeader>
+          <CModalTitle>Generate Mass Payroll</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {massGenerateError && (
+            <CAlert color="danger" className="mb-3">
+              {massGenerateError}
+            </CAlert>
+          )}
+
+          <div className="mb-3">
+            <label className="form-label">Payroll Period</label>
+            <CFormInput
+              type="text"
+              placeholder="Enter period (e.g., 202501)"
+              value={massPayrollPeriod}
+              onChange={(e) => setMassPayrollPeriod(e.target.value)}
+              disabled={massGenerating}
+            />
+            <small className="text-muted">
+              Format: YYYYMM (e.g., 202501 for January 2025)
+            </small>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={closeMassGenerateModal}
+            disabled={massGenerating}
+          >
+            Cancel
+          </CButton>
+          <CButton
+            color="primary"
+            onClick={handleMassPayrollGenerate}
+            disabled={massGenerating}
+          >
+            {massGenerating ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Generating...
+              </>
+            ) : (
+              'Generate Payroll'
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+      
+      {/* Generate Mass Slip Modal */}
+      <CModal
+        visible={showMassSlipModal}
+        onClose={closeMassSlipModal}
+      >
+        <CModalHeader>
+          <CModalTitle>Generate Mass Slip</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {massSlipError && (
+            <CAlert color="danger" className="mb-3">
+              {massSlipError}
+            </CAlert>
+          )}
+
+          <div className="mb-3">
+            <label className="form-label">Payroll Period</label>
+            <CFormInput
+              type="text"
+              placeholder="Enter period (e.g., 202501)"
+              value={massSlipPeriod}
+              onChange={(e) => setMassSlipPeriod(e.target.value)}
+              disabled={massSlipGenerating}
+            />
+            <small className="text-muted">
+              Format: YYYYMM (e.g., 202501 for January 2025)
+            </small>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={closeMassSlipModal}
+            disabled={massSlipGenerating}
+          >
+            Cancel
+          </CButton>
+          <CButton
+            color="primary"
+            onClick={handleMassSlipGenerate}
+            disabled={massSlipGenerating}
+          >
+            {massSlipGenerating ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Generating...
+              </>
+            ) : (
+              'Generate Slip'
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+      
+      {/* Mass Email Slip Modal */}
+      <CModal
+        visible={showMassEmailModal}
+        onClose={closeMassEmailModal}
+      >
+        <CModalHeader>
+          <CModalTitle>Send Mass Slip Email</CModalTitle>
+        </CModalHeader>
+        <CForm onSubmit={handleMassEmailPrepare}>
+          <CModalBody>
+            {massEmailError && (
+              <CAlert color="danger" className="mb-3">
+                {massEmailError}
+              </CAlert>
+            )}
+
+            <div className="mb-3">
+              <label className="form-label">Payroll Period</label>
+              <CFormInput
+                type="text"
+                placeholder="Enter period (e.g., 202501)"
+                value={massEmailPeriod}
+                onChange={(e) => setMassEmailPeriod(e.target.value)}
+                disabled={massEmailSending}
+              />
+              <small className="text-muted">
+                Format: YYYYMM (e.g., 202501 for January 2025)
+              </small>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label">Company</label>
+              <CFormSelect
+                value={massEmailCompanyId}
+                onChange={(e) => setMassEmailCompanyId(e.target.value)}
+                disabled={massEmailSending || downloadCompanies.length === 0}
+              >
+                <option value="">Select company</option>
+                {downloadCompanies.map((company) => (
+                  <option key={company.value} value={company.value}>
+                    {company.label}
+                  </option>
+                ))}
+              </CFormSelect>
+              {downloadCompanies.length === 0 && (
+                <small className="text-muted">
+                  No companies available. Please ensure company data is loaded.
+                </small>
+              )}
+            </div>
+          </CModalBody>
+          <CModalFooter>
+            <CButton
+              color="secondary"
+              onClick={closeMassEmailModal}
+              disabled={massEmailSending}
+            >
+              Cancel
+            </CButton>
+            <CButton
+              color="warning"
+              type="submit"
+              disabled={
+                massEmailSending ||
+                downloadCompanies.length === 0
+              }
+            >
+              Send Email
+            </CButton>
+          </CModalFooter>
+      </CForm>
+    </CModal>
+      
+      {/* Mass Email Confirmation Modal */}
+      <CModal
+        visible={!!massEmailConfirmPayload}
+        onClose={cancelMassEmailConfirm}
+      >
+        <CModalHeader>
+          <CModalTitle>Confirm Mass Slip Email</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <p>
+            Send payroll slips for period{' '}
+            <strong>{massEmailConfirmPayload?.period}</strong> to company{' '}
+            <strong>{getCompanyOptionLabel(massEmailConfirmPayload?.companyId)}</strong>?
+          </p>
+          <p className="mb-0">
+            This will email slips to all eligible employees in the selected company.
+          </p>
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={cancelMassEmailConfirm}
+            disabled={massEmailSending}
+          >
+            Back
+          </CButton>
+          <CButton
+            color="warning"
+            onClick={handleMassEmailConfirm}
+            disabled={massEmailSending}
+          >
+            {massEmailSending ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Sending...
+              </>
+            ) : (
+              'Send Emails'
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+      
+      {/* Generate Slip Modal */}{/* Generate Slip Modal */}
       <CModal
         visible={showRegenerateModal}
         onClose={closeRegenerateModal}
@@ -1123,6 +1763,115 @@ const generatePayroll = async (e) => {
               </>
             ) : (
               'Generate Slip'
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+      {/* Download Payroll Modal */}
+      <CModal
+        visible={showDownloadModal}
+        onClose={closeDownloadModal}
+      >
+        <CModalHeader>
+          <CModalTitle>Download Payroll</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {downloadError && (
+            <CAlert color="danger" className="mb-3">
+              {downloadError}
+            </CAlert>
+          )}
+
+          <div className="mb-3">
+            <label className="form-label">Payroll Period</label>
+            <CFormInput
+              type="text"
+              placeholder="Enter period (e.g., 202501)"
+              value={downloadPeriod}
+              onChange={(e) => setDownloadPeriod(e.target.value)}
+              disabled={downloading}
+            />
+            <small className="text-muted">
+              Format: YYYYMM (e.g., 202501 for January 2025)
+            </small>
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label">Company</label>
+            <CFormSelect
+              value={downloadCompanyId}
+              onChange={(e) => setDownloadCompanyId(e.target.value)}
+              disabled={downloading || downloadCompanies.length === 0}
+            >
+              <option value="">Select company</option>
+              {downloadCompanies.map((company) => (
+                <option key={company.value} value={company.value}>
+                  {company.label}
+                </option>
+              ))}
+            </CFormSelect>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={closeDownloadModal}
+            disabled={downloading}
+          >
+            Cancel
+          </CButton>
+          <CButton
+            color="dark"
+            onClick={handlePayrollDownload}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Downloading...
+              </>
+            ) : (
+              'Download'
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+      
+      {/* Email Slip Confirmation Modal */}
+      <CModal
+        visible={!!emailConfirmTarget}
+        onClose={() => setEmailConfirmTarget(null)}
+      >
+        <CModalHeader>
+          <CModalTitle>Send Slip Email</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <p>
+            Send payroll slip email to{' '}
+            <strong>{emailConfirmTarget?.employee?.name || 'this employee'}</strong>{' '}
+            for period <strong>{emailConfirmTarget?.payroll_periode}</strong>?
+          </p>
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={() => setEmailConfirmTarget(null)}
+            disabled={emailingSlipId === emailConfirmTarget?.payroll_id}
+          >
+            Cancel
+          </CButton>
+          <CButton
+            color="warning"
+            onClick={handleEmailSlip}
+            disabled={emailingSlipId === emailConfirmTarget?.payroll_id}
+          >
+            {emailingSlipId === emailConfirmTarget?.payroll_id ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Sending...
+              </>
+            ) : (
+              'Send Email'
             )}
           </CButton>
         </CModalFooter>

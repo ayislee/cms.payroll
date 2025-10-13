@@ -19,9 +19,67 @@ class EmployeeService {
       
       const url = `${API_ENDPOINTS.EMPLOYEES.LIST}?${queryParams.toString()}`;
       const response = await apiClient.get(url);
-      
-      // Handle the actual backend response structure
-      return response.data || { total: 0, data: [] };
+      const raw = response.data || {};
+
+      const topLevel = raw && typeof raw === 'object' && 'data' in raw ? raw.data : raw;
+
+      let pagination = topLevel;
+      if (pagination && typeof pagination === 'object') {
+        if (Array.isArray(pagination.data)) {
+          pagination = {
+            ...pagination,
+            data: pagination.data
+          };
+        } else if (pagination.data && typeof pagination.data === 'object' && Array.isArray(pagination.data.data)) {
+          pagination = {
+            ...pagination,
+            ...pagination.data,
+            data: pagination.data.data
+          };
+        }
+      }
+
+      const employees = Array.isArray(pagination?.data)
+        ? pagination.data
+        : Array.isArray(topLevel)
+        ? topLevel
+        : [];
+
+      const totalSource = pagination?.total ?? pagination?.count ?? employees.length ?? 0;
+      const total = Number(totalSource) || 0;
+
+      const perPageSource =
+        pagination?.perPage ??
+        pagination?.per_page ??
+        params.rows ??
+        employees.length ??
+        0;
+      const perPage = Number(perPageSource) || 1;
+
+      const pageSource =
+        pagination?.page ??
+        pagination?.current_page ??
+        params.page ??
+        1;
+      const page = Number(pageSource) || 1;
+
+      const computedLastPage = perPage > 0 ? Math.ceil(total / perPage) : 1;
+      const lastPageSource =
+        pagination?.lastPage ??
+        pagination?.last_page ??
+        computedLastPage ??
+        1;
+      const lastPage = Number(lastPageSource) || 1;
+
+      return {
+        status: raw.status ?? true,
+        message: raw.message ?? '',
+        data: employees,
+        total,
+        perPage,
+        page,
+        lastPage
+      };
     } catch (error) {
       throw this.handleError(error);
     }

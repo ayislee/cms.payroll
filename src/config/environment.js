@@ -48,7 +48,7 @@ const config = {
 
   // Pagination Configuration
   pagination: {
-    defaultRows: 5,
+    defaultRows: 25,
     maxRows: 100,
     pageSizeOptions: [5, 10, 25, 50, 100]
   },

@@ -35,8 +35,7 @@ import { useDocumentTitle } from '../../../utils/documentTitle';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import { PTKP_OPTIONS } from '../../../constants/payrollConstants';
 import employeeService from '../services/employeeService';
-import apiClient from '../../../utils/apiClient';
-import { API_ENDPOINTS } from '../../../constants/apiEndpoints';
+import companyService from '../../companies/services/companyService';
 
 const EmployeeForm = () => {
   const navigate = useNavigate();
@@ -93,12 +92,25 @@ const EmployeeForm = () => {
   // Load companies for dropdown and suggest next employee ID
   useEffect(() => {
     const loadInitialData = async () => {
-      // For now, use mock companies until backend API is ready
-      setCompanies([
-        { company_id: 1, name: 'PT Company A', code: 'PTA' },
-        { company_id: 2, name: 'PT Company B', code: 'PTB' },
-        { company_id: 3, name: 'PT Company C', code: 'PTC' }
-      ]);
+      try {
+        setLoading(true);
+
+        const options = await companyService.getCompanyOptions();
+        const mappedCompanies = options.map((option) => {
+          const optionCompany = option.company || {};
+          return {
+            company_id: option.value,
+            name: optionCompany.name || option.label || 'Unknown Company'
+          };
+        });
+
+        setCompanies(mappedCompanies);
+      } catch (error) {
+        console.error('Error loading companies:', error);
+        setCompanies([]);
+      } finally {
+        setLoading(false);
+      }
 
       // Auto-suggest next employee ID for create mode only
       if (!isEdit) {
@@ -152,7 +164,10 @@ const EmployeeForm = () => {
             state: employee.state || '',
             country: employee.country || '',
             zip: employee.zip || '',
-            company_id: employee.company_id || '',
+            company_id:
+              employee.company_id !== undefined && employee.company_id !== null
+                ? String(employee.company_id)
+                : '',
             ptkp: employee.ptkp || '',
             job_position: employee.job_position || '',
             grade: employee.grade || '',
@@ -163,6 +178,28 @@ const EmployeeForm = () => {
             nama_rekening: employee.nama_rekening || '',
             npwp: employee.npwp || ''
           });
+
+          if (employee.company_id) {
+            setCompanies((prev) => {
+              const exists = prev.some(
+                (company) => String(company.company_id) === String(employee.company_id)
+              );
+
+              if (exists) {
+                return prev;
+              }
+
+              const companyData = employee.company || {};
+
+              return [
+                ...prev,
+                {
+                  company_id: employee.company_id,
+                  name: companyData.name || employee.company_name || `Company #${employee.company_id}`
+                }
+              ];
+            });
+          }
         } else {
           console.warn('Employee not found, trying mock data');
           setError('Employee not found');
@@ -434,13 +471,30 @@ const EmployeeForm = () => {
                         value={formData.company_id}
                         onChange={handleInputChange}
                         invalid={!!errors.company_id}
+                        disabled={loading}
                       >
                         <option value="">Select Company</option>
-                        {companies.map((company) => (
-                          <option key={company.company_id} value={company.company_id}>
-                            {company.name} ({company.code})
-                          </option>
-                        ))}
+                        {loading && (
+                          <option disabled>Loading companies...</option>
+                        )}
+                        {!loading && companies.length === 0 && (
+                          <option disabled>No active companies available</option>
+                        )}
+                        {!loading &&
+                          companies.map((company) => {
+                            const label = company.company_id
+                              ? `${company.name} (ID #${company.company_id})`
+                              : company.name;
+
+                            return (
+                              <option
+                                key={company.company_id}
+                                value={String(company.company_id)}
+                              >
+                                {label}
+                              </option>
+                            );
+                          })}
                       </CFormSelect>
                       {errors.company_id && (
                         <div className="invalid-feedback d-block">

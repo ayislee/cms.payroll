@@ -18,9 +18,79 @@ class CompanyService {
 
       const url = `${API_ENDPOINTS.COMPANIES.LIST}?${queryParams.toString()}`;
       const response = await apiClient.get(url);
+      const raw = response.data || {};
 
-      // Handle the actual backend response structure
-      return response.data || { total: 0, data: [] };
+      const topLevel = raw && typeof raw === 'object' && 'data' in raw ? raw.data : raw;
+
+      let pagination = topLevel;
+      if (pagination && typeof pagination === 'object') {
+        if (Array.isArray(pagination.data)) {
+          pagination = {
+            ...pagination,
+            data: pagination.data
+          };
+        } else if (pagination.data && typeof pagination.data === 'object' && Array.isArray(pagination.data.data)) {
+          pagination = {
+            ...pagination,
+            ...pagination.data,
+            data: pagination.data.data
+          };
+        }
+      }
+
+      const companies = Array.isArray(pagination?.data)
+        ? pagination.data
+        : Array.isArray(topLevel)
+        ? topLevel
+        : [];
+
+      const totalSource =
+        pagination?.total ??
+        pagination?.count ??
+        raw?.total ??
+        raw?.count ??
+        companies.length ??
+        0;
+      const total = Number(totalSource) || 0;
+
+      const perPageSource =
+        pagination?.perPage ??
+        pagination?.per_page ??
+        params.rows ??
+        companies.length ??
+        0;
+      const perPage = Number(perPageSource) || (params.rows || companies.length || 1);
+
+      const pageSource =
+        pagination?.page ??
+        pagination?.current_page ??
+        raw?.page ??
+        params.page ??
+        1;
+      const page = Number(pageSource) || 1;
+
+      const computedLastPage = perPage > 0 ? Math.ceil(total / perPage) : 1;
+      const lastPageSource =
+        pagination?.lastPage ??
+        pagination?.last_page ??
+        raw?.lastPage ??
+        raw?.last_page ??
+        computedLastPage ??
+        1;
+      const lastPage = Number(lastPageSource) || 1;
+
+      return {
+        status: raw.status ?? true,
+        message: raw.message ?? '',
+        data: companies,
+        total,
+        perPage,
+        page,
+        lastPage,
+        meta: {
+          raw
+        }
+      };
     } catch (error) {
       throw this.handleError(error);
     }
@@ -95,10 +165,12 @@ class CompanyService {
   // Search companies
   async searchCompanies(searchTerm, params = {}) {
     try {
-      return await this.getCompanies({
+      const response = await this.getCompanies({
         ...params,
         search: searchTerm
       });
+
+      return response;
     } catch (error) {
       throw this.handleError(error);
     }
@@ -126,6 +198,15 @@ class CompanyService {
     }
   }
 
+  async syncExternalCompanies() {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.COMPANIES.SYNC_EXTERNAL);
+      return response.data || response;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   // Validate company data
   validateCompanyData(data) {
     const errors = {};
@@ -135,14 +216,6 @@ class CompanyService {
       errors.name = 'Company name is required';
     } else if (data.name && data.name.length < 2) {
       errors.name = 'Company name must be at least 2 characters';
-    }
-
-    if (!data.code) {
-      errors.code = 'Company code is required';
-    } else if (data.code.length < 2) {
-      errors.code = 'Company code must be at least 2 characters';
-    } else if (data.code.length > 50) {
-      errors.code = 'Company code cannot exceed 50 characters';
     }
 
     // Optional fields validation
@@ -224,6 +297,76 @@ class CompanyService {
       console.error('Error fetching company options:', error);
       return [];
     }
+  }
+
+  // Format company list item with fallbacks
+  formatCompanyListItem(company) {
+    if (!company || typeof company !== 'object') {
+      return {
+        company_id: null,
+        name: 'Unknown Company',
+        email: '-',
+        phone: '-',
+        address: '',
+        is_active: false,
+        created_at: null,
+        updated_at: null
+      };
+    }
+
+    return {
+      company_id: company.company_id ?? company.id ?? null,
+      name: company.name ?? company.company_name ?? 'Unnamed Company',
+      email: company.email ?? company.contact_email ?? '',
+      phone: company.phone ?? company.contact_phone ?? '',
+      address: company.address ?? company.location ?? '',
+      is_active: company.is_active ?? company.active ?? true,
+      created_at: company.created_at ?? company.createdAt ?? null,
+      updated_at: company.updated_at ?? company.updatedAt ?? null,
+      stats: company.stats ?? company.metrics ?? {}
+    };
+  }
+
+  buildSearchIndex(companies = []) {
+    const tokens = new Set();
+
+    companies.forEach((company) => {
+      const item = this.formatCompanyListItem(company);
+      [item.name, item.email, item.phone]
+        .filter(Boolean)
+        .forEach((value) => {
+          value
+            .toString()
+            .toLowerCase()
+            .split(/\s|,|\.|-/)
+            .filter(Boolean)
+            .forEach((token) => tokens.add(token));
+        });
+    });
+
+    return Array.from(tokens);
+  }
+
+  calculateSummary(companies = []) {
+    const normalised = companies.map((company) => this.formatCompanyListItem(company));
+    const total = normalised.length;
+
+    const active = normalised.filter((company) => company.is_active).length;
+    const inactive = total - active;
+
+    const latestUpdate = normalised
+      .map((company) => company.updated_at || company.created_at)
+      .filter(Boolean)
+      .map((value) => new Date(value))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+
+    return {
+      total,
+      active,
+      inactive,
+      latestUpdate
+    };
   }
 }
 

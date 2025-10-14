@@ -339,10 +339,19 @@ class EmployeeService {
       throw this.handleError(error);
     }
   }
+
+  async syncExternalEmployees() {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.EMPLOYEES.SYNC_EXTERNAL);
+      return response.data || response;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
 }
 
 // Create singleton instance
 const employeeService = new EmployeeService();
-console.log('EmployeeService instance created with methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(employeeService)));
+
 
 export default employeeService;

@@ -243,11 +243,17 @@ class UserService {
         (perPage ? Math.max(Math.ceil(total / perPage), 1) : 1);
 
       return {
+        status: payload.status ?? true,
+        message: payload.message ?? '',
         total,
         perPage,
         page,
         lastPage,
-        data: users
+        data: users,
+        meta: {
+          raw: payload,
+          ...meta
+        }
       };
     } catch (error) {
       throw this.handleError(error);
@@ -331,13 +337,96 @@ class UserService {
   async getUserOptions(params = {}) {
     try {
       const response = await this.getActiveUsers(params);
-      return response.data.map(user => ({
-        value: user.user_id,
-        label: user.name
-      }));
+      return (response.data || []).map((user) => {
+        const formatted = this.formatUserListItem(user);
+        return {
+          value: formatted.user_id,
+          label: formatted.name,
+          user: formatted
+        };
+      });
     } catch (error) {
       throw this.handleError(error);
     }
+  }
+
+  formatUserListItem(user) {
+    const item = normalizeUser(user);
+
+    if (!item || typeof item !== 'object') {
+      return {
+        user_id: null,
+        name: 'Unknown User',
+        email: '-',
+        phone: '-',
+        type: USER_ROLES.USER,
+        company_id: null,
+        company_name: '-',
+        is_active: false,
+        status: 'inactive',
+        created_at: null,
+        updated_at: null
+      };
+    }
+
+    return {
+      ...item,
+      user_id: item.user_id ?? item.id ?? null,
+      name: item.name || 'Unnamed User',
+      email: item.email || item.username || '-',
+      phone: item.phone || item.phone_number || '-',
+      type: normalizeUserType(item.type),
+      company_id: extractCompanyId(item),
+      company_name: extractCompanyName(item) || '-',
+      is_active: normalizeBoolean(item.is_active ?? item.active),
+      status: item.status || (item.is_active ? 'active' : 'inactive'),
+      created_at: item.created_at ?? item.createdAt ?? null,
+      updated_at: item.updated_at ?? item.updatedAt ?? null
+    };
+  }
+
+  buildSearchIndex(users = []) {
+    const tokens = new Set();
+
+    users.forEach((user) => {
+      const item = this.formatUserListItem(user);
+      [item.name, item.email, item.phone, item.company_name, item.type]
+        .filter(Boolean)
+        .forEach((value) => {
+          value
+            .toString()
+            .toLowerCase()
+            .split(/\s|,|\.|-/)
+            .filter(Boolean)
+            .forEach((token) => tokens.add(token));
+        });
+    });
+
+    return Array.from(tokens);
+  }
+
+  calculateSummary(users = []) {
+    const normalised = users.map((user) => this.formatUserListItem(user));
+    const total = normalised.length;
+
+    const active = normalised.filter((user) => user.is_active).length;
+    const inactive = total - active;
+    const admin = normalised.filter((user) => normalizeUserType(user.type) === USER_ROLES.ADMIN).length;
+
+    const latestUpdate = normalised
+      .map((user) => user.updated_at || user.created_at)
+      .filter(Boolean)
+      .map((value) => new Date(value))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+
+    return {
+      total,
+      active,
+      inactive,
+      admin,
+      latestUpdate
+    };
   }
 
   // Client-side validation for user data

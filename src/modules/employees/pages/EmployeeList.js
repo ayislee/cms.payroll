@@ -49,7 +49,8 @@ import {
   cilSettings,
   cilBuilding,
   cilUserFollow,
-  cilClock
+  cilClock,
+  cilSync
 } from '@coreui/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
@@ -334,6 +335,12 @@ const EmployeeList = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
+  const canCreateEmployee = hasPermission(PERMISSIONS.EMPLOYEES_CREATE);
+  const canUpdateEmployee = hasPermission(PERMISSIONS.EMPLOYEES_UPDATE);
+  const canSyncEmployees = canCreateEmployee || canUpdateEmployee;
 
   const ptkpLabelMap = useMemo(() => {
     return PTKP_OPTIONS.reduce((map, option) => {
@@ -650,6 +657,38 @@ const EmployeeList = () => {
     }
   }, [currentPage, employeeToDelete, loadEmployees, searchTerm]);
 
+  const handleOpenSyncModal = useCallback(() => {
+    setShowSyncModal(true);
+  }, []);
+
+  const handleCloseSyncModal = useCallback(() => {
+    if (!syncing) {
+      setShowSyncModal(false);
+    }
+  }, [syncing]);
+
+  const confirmSync = useCallback(async () => {
+    try {
+      setSyncing(true);
+      setError('');
+
+      await employeeService.syncExternalEmployees();
+
+      setShowSyncModal(false);
+      setInfoMessage(
+        'Sinkronisasi karyawan sedang diproses. Data akan diperbarui setelah backend menyelesaikan proses.'
+      );
+      loadEmployees(currentPage, searchTerm);
+    } catch (syncError) {
+      console.error('Error syncing employees:', syncError);
+      setShowSyncModal(false);
+      setInfoMessage('');
+      setError(syncError.message || 'Failed to sync employees');
+    } finally {
+      setSyncing(false);
+    }
+  }, [currentPage, loadEmployees, searchTerm]);
+
   const handleCreateEmployee = useCallback(() => {
     navigate('/employees/create');
   }, [navigate]);
@@ -734,7 +773,19 @@ const EmployeeList = () => {
             <CIcon icon={cilClock} className="me-2" />
             {lastUpdatedLabel}
           </span>
-          {hasPermission(PERMISSIONS.EMPLOYEES_CREATE) && (
+          {canSyncEmployees && (
+            <CButton
+              color="light"
+              variant="outline"
+              className="fw-semibold text-primary"
+              onClick={handleOpenSyncModal}
+              disabled={syncing}
+            >
+              <CIcon icon={cilSync} className="me-2" />
+              Sinkronisasi Karyawan
+            </CButton>
+          )}
+          {canCreateEmployee && (
             <CButton color="light" className="text-primary fw-semibold" onClick={handleCreateEmployee}>
               <CIcon icon={cilPlus} className="me-2" />
               Add Employee
@@ -976,6 +1027,14 @@ const EmployeeList = () => {
               </CButton>
             </CAlert>
           )}
+          {infoMessage && (
+            <CAlert color="success" className="mb-4 d-flex align-items-center justify-content-between">
+              <span>{infoMessage}</span>
+              <CButton color="success" variant="outline" size="sm" onClick={() => setInfoMessage('')}>
+                Tutup
+              </CButton>
+            </CAlert>
+          )}
 
           <div className="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
             <small className="text-medium-emphasis">{summaryText}</small>
@@ -990,9 +1049,6 @@ const EmployeeList = () => {
               <CTableRow>
                 <CTableHeaderCell scope="col" className="text-uppercase small text-medium-emphasis">
                   ID
-                </CTableHeaderCell>
-                <CTableHeaderCell scope="col" className="text-uppercase small text-medium-emphasis">
-                  NIK
                 </CTableHeaderCell>
                 <CTableHeaderCell scope="col" className="text-uppercase small text-medium-emphasis">
                   Employee
@@ -1023,11 +1079,11 @@ const EmployeeList = () => {
                         #{employee.employee_id}
                       </CBadge>
                     </CTableDataCell>
-                    <CTableDataCell>
-                      <strong>{employee.nik}</strong>
-                    </CTableDataCell>
                     <CTableDataCell className="text-break">
                       <div className="fw-semibold text-dark">{employee.name}</div>
+                      <small className="d-block text-medium-emphasis">
+                        NIK: {employee.nik || '-'}
+                      </small>
                       {employee.job_title && (
                         <small className="d-block text-medium-emphasis">{employee.job_title}</small>
                       )}
@@ -1092,7 +1148,7 @@ const EmployeeList = () => {
                 ))
               ) : (
                 <CTableRow>
-                  <CTableDataCell colSpan={8} className="text-center py-5">
+                  <CTableDataCell colSpan={7} className="text-center py-5">
                     <div className="py-4">
                       <CIcon
                         icon={trimmedSearchTerm ? cilMagnifyingGlass : cilPeople}
@@ -1164,6 +1220,31 @@ const EmployeeList = () => {
       </CCard>
 
       {/* Delete Confirmation Modal */}
+      <CModal visible={showSyncModal} onClose={handleCloseSyncModal}>
+        <CModalHeader>
+          <CModalTitle>Konfirmasi Sinkronisasi</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          Sinkronisasi akan mengambil data karyawan terbaru dari sistem eksternal. Proses ini mungkin memerlukan beberapa
+          menit dan tidak dapat dibatalkan. Lanjutkan?
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" variant="outline" onClick={handleCloseSyncModal} disabled={syncing}>
+            Batal
+          </CButton>
+          <CButton color="primary" onClick={confirmSync} disabled={syncing}>
+            {syncing ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Menyinkronkan...
+              </>
+            ) : (
+              'Mulai Sinkronisasi'
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
       <CModal visible={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
         <CModalHeader>
           <CModalTitle>Confirm Delete</CModalTitle>

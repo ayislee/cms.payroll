@@ -288,7 +288,9 @@ const EmployeeDetail = () => {
     <>
       {/* Breadcrumb */}
       <CBreadcrumb className="mb-4">
-        <CBreadcrumbItem href="/employees">Employees</CBreadcrumbItem>
+        <CBreadcrumbItem>
+          <Link to="/employees">Employees</Link>
+        </CBreadcrumbItem>
         <CBreadcrumbItem active>{employee.name}</CBreadcrumbItem>
       </CBreadcrumb>
 
@@ -491,9 +493,14 @@ const EmployeeDetail = () => {
                                   <div className="text-medium-emphasis small">Assigned company</div>
                                 </div>
                                 <div className="text-end">
-                                  <CBadge color="info">
-                                    Company ID: {employee.company_id}
-                                  </CBadge>
+                                  <div className="fw-semibold">
+                                    {employee.company?.name || employee.company_name || 'N/A'}
+                                  </div>
+                                  {employee.company_id && (
+                                    <CBadge color="info" className="mt-1">
+                                      ID: {employee.company_id}
+                                    </CBadge>
+                                  )}
                                 </div>
                               </CListGroupItem>
 

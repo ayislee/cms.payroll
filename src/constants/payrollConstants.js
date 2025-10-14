@@ -137,7 +137,6 @@ export const VALIDATION_RULES = {
   PHONE: /^(\+62|62|0)8[1-9][0-9]{6,9}$/,
   NIK: /^[0-9]{16}$/,
   EMPLOYEE_CODE: /^[A-Z0-9]{3,10}$/,
-  COMPANY_CODE: /^[A-Z0-9]{2,5}$/,
   COMPONENT_CODE: /^[A-Z_0-9]{2,10}$/,
   PASSWORD: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/
 };

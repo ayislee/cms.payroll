@@ -34,7 +34,8 @@ export const API_ENDPOINTS = {
     CREATE: `${API_BASE}/employee`,
     UPDATE: `${API_BASE}/employee/`,
     DELETE: (id) => `${API_BASE}/employee/${id}`,
-    GET_ALL: `${API_BASE}/employee/get-all-employee`
+    GET_ALL: `${API_BASE}/employee/get-all-employee`,
+    SYNC_EXTERNAL: `${API_BASE}/employee/sync-external`
   },
 
   // Employee Component Endpoints
@@ -53,7 +54,8 @@ export const API_ENDPOINTS = {
     DELETE: (id) => `${API_BASE}/company?company_id=${id}`,
     TOGGLE_STATUS: (id) => `${API_BASE}/company/toggle-status?company_id=${id}`,
     STATS: (id) => `${API_BASE}/company/stats?company_id=${id}`,
-    BULK_CREATE: `${API_BASE}/company/bulk-create`
+    BULK_CREATE: `${API_BASE}/company/bulk-create`,
+    SYNC_EXTERNAL: `${API_BASE}/company/sync-external`
   },
 
   // Main Component Endpoints

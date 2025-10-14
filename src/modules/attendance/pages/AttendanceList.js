@@ -2,7 +2,7 @@
 // ATTENDANCE LIST PAGE
 // ========================================
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   CRow,
   CCol,
@@ -29,15 +29,31 @@ import {
   CInputGroupText,
   CListGroup,
   CListGroupItem,
+  CCollapse,
   CModal,
   CModalHeader,
   CModalTitle,
   CModalBody,
-  CModalFooter
+  CModalFooter,
+  CBadge,
+  CProgress,
+  CProgressBar
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilSearch, cilFilter, cilTrash, cilPen } from '@coreui/icons';
+import {
+  cilSearch,
+  cilFilter,
+  cilTrash,
+  cilPen,
+  cilPlus,
+  cilCalendar,
+  cilPeople,
+  cilSpeedometer,
+  cilWarning,
+  cilLoopCircular
+} from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
+import { formatPayrollPeriod, formatDate as formatDisplayDate } from '../../../utils/formatters';
 import attendanceService from '../services/attendanceService';
 import employeeService from '../../employees/services/employeeService';
 
@@ -52,6 +68,14 @@ const AttendanceList = () => {
   const [searchTerm, setSearchTerm] = useState(''); // Current input value
   const [appliedSearchTerm, setAppliedSearchTerm] = useState(''); // Search term that's been applied
   const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    payroll_periode: '',
+    employee_id: ''
+  });
+  const [appliedFilters, setAppliedFilters] = useState({
+    payroll_periode: '',
+    employee_id: ''
+  });
   const initialFormState = {
     employee_id: '',
     payroll_periode: '',
@@ -77,20 +101,79 @@ const AttendanceList = () => {
   const [deletingAttendanceId, setDeletingAttendanceId] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [pendingDeleteAttendance, setPendingDeleteAttendance] = useState(null);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncPeriod, setSyncPeriod] = useState('');
+  const [syncError, setSyncError] = useState('');
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
+  const [pendingSyncPeriod, setPendingSyncPeriod] = useState('');
   const searchInputRef = useRef(null);
+
+  const summaryMetrics = useMemo(() => {
+    if (!Array.isArray(attendances) || attendances.length === 0) {
+      return {
+        totalWorkingDays: 0,
+        actualWorkingDays: 0,
+        absentDays: 0,
+        attendanceRate: 0,
+        uniqueEmployees: 0
+      };
+    }
+
+    const uniqueEmployeeIds = new Set();
+    let totalWorkingDays = 0;
+    let totalActualDays = 0;
+    let totalAbsentDays = 0;
+
+    attendances.forEach((attendance) => {
+      uniqueEmployeeIds.add(attendance.employee_id);
+
+      const workingDays = Number(attendance.total_working_days) || 0;
+      const actualDays = Number(attendance.actual_working_days) || 0;
+      const absentDays = Number(attendance.absent_days) || 0;
+
+      totalWorkingDays += workingDays;
+      totalActualDays += actualDays;
+      totalAbsentDays += absentDays;
+    });
+
+    const attendanceRate =
+      totalWorkingDays > 0 ? Math.round((totalActualDays / totalWorkingDays) * 100) : 0;
+
+    return {
+      totalWorkingDays,
+      actualWorkingDays: totalActualDays,
+      absentDays: totalAbsentDays,
+      attendanceRate,
+      uniqueEmployees: uniqueEmployeeIds.size
+    };
+  }, [attendances]);
 
   useDocumentTitle('Attendance List');
 
   const loadAttendances = async () => {
     try {
       setLoading(true);
-      
+
+      const trimmedSearch = appliedSearchTerm.trim();
+      const trimmedPeriod = appliedFilters.payroll_periode.trim();
+      const trimmedEmployeeId = appliedFilters.employee_id.trim();
+
       const serviceParams = {
         page: currentPage,
-        rows: pageSize,
-        search: appliedSearchTerm
+        rows: pageSize
       };
-      
+
+      if (trimmedSearch) {
+        serviceParams.search = trimmedSearch;
+      }
+      if (trimmedPeriod) {
+        serviceParams.payroll_periode = trimmedPeriod;
+      }
+      if (trimmedEmployeeId) {
+        serviceParams.employee_id = trimmedEmployeeId;
+      }
+
       const response = await attendanceService.getAttendances(serviceParams);
       
       if (response) {
@@ -118,7 +201,13 @@ const AttendanceList = () => {
   // Load attendances when page, page size, or applied search term changes
   useEffect(() => {
     loadAttendances();
-  }, [currentPage, pageSize, appliedSearchTerm]);
+  }, [
+    currentPage,
+    pageSize,
+    appliedSearchTerm,
+    appliedFilters.payroll_periode,
+    appliedFilters.employee_id
+  ]);
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -131,10 +220,113 @@ const AttendanceList = () => {
     setSearchTerm(e.target.value);
   };
 
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleOpenSyncModal = () => {
+    if (syncLoading) {
+      return;
+    }
+    const defaultPeriod =
+      (filters.payroll_periode || '').trim() ||
+      (appliedFilters.payroll_periode || '').trim();
+
+    setSyncPeriod(defaultPeriod);
+    setSyncError('');
+    setShowSyncModal(true);
+    setShowSyncConfirm(false);
+    setPendingSyncPeriod('');
+  };
+
+  const handleCloseSyncModal = () => {
+    if (syncLoading) {
+      return;
+    }
+    setShowSyncModal(false);
+    setSyncError('');
+    setPendingSyncPeriod('');
+  };
+
+  const handleSyncSubmit = (e) => {
+    e.preventDefault();
+    if (syncLoading) {
+      return;
+    }
+
+    const trimmedPeriod = syncPeriod.trim();
+
+    if (!trimmedPeriod) {
+      setSyncError('Payroll period is required.');
+      return;
+    }
+
+    if (!/^\d{6}$/.test(trimmedPeriod)) {
+      setSyncError('Payroll period must follow the YYYYMM format (e.g., 202509).');
+      return;
+    }
+
+    setSyncError('');
+    setPendingSyncPeriod(trimmedPeriod);
+    setShowSyncModal(false);
+    setShowSyncConfirm(true);
+  };
+
+  const handleCancelSyncConfirm = () => {
+    if (syncLoading) {
+      return;
+    }
+
+    setShowSyncConfirm(false);
+    if (pendingSyncPeriod) {
+      setSyncPeriod(pendingSyncPeriod);
+    }
+    setSyncError('');
+    setPendingSyncPeriod('');
+    setShowSyncModal(true);
+  };
+
+  const handleConfirmSync = async () => {
+    const period = (pendingSyncPeriod || syncPeriod || '').trim();
+
+    if (!period) {
+      return;
+    }
+
+    try {
+      setSyncLoading(true);
+      await attendanceService.syncExternal({
+        payroll_period: period
+      });
+      setSuccessMessage('Attendance synchronization requested successfully.');
+      setPendingSyncPeriod('');
+      setShowSyncConfirm(false);
+      setSyncPeriod('');
+      setSyncError('');
+      await loadAttendances();
+    } catch (error) {
+      console.error('Error syncing attendance:', error);
+      setSyncError(error.message || 'Failed to synchronize attendance.');
+      setSyncPeriod(period);
+      setPendingSyncPeriod('');
+      setShowSyncConfirm(false);
+      setShowSyncModal(true);
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   // Handle search form submission - only time we hit the API
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setAppliedSearchTerm(searchTerm);
+    setAppliedSearchTerm(searchTerm.trim());
+    setAppliedFilters({
+      payroll_periode: filters.payroll_periode.trim(),
+      employee_id: filters.employee_id.trim()
+    });
     setCurrentPage(1);
   };
 
@@ -144,12 +336,72 @@ const AttendanceList = () => {
   const resetFilters = () => {
     setSearchTerm('');
     setAppliedSearchTerm('');
+    setFilters({
+      payroll_periode: '',
+      employee_id: ''
+    });
+    setAppliedFilters({
+      payroll_periode: '',
+      employee_id: ''
+    });
     setCurrentPage(1);
   };
 
   const handlePageSizeChange = (size) => {
     setPageSize(size);
     setCurrentPage(1);
+  };
+
+  const resolvePeriodLabel = (period) => {
+    const normalized = String(period || '').trim();
+
+    if (/^\d{6}$/.test(normalized)) {
+      return {
+        formatted: formatPayrollPeriod(normalized),
+        raw: normalized
+      };
+    }
+
+    if (normalized) {
+      return {
+        formatted: normalized,
+        raw: normalized
+      };
+    }
+
+    return {
+      formatted: '-',
+      raw: '-'
+    };
+  };
+
+  const formatCreatedAt = (timestamp) => {
+    if (!timestamp) {
+      return '-';
+    }
+
+    return formatDisplayDate(timestamp, 'DD MMM YYYY');
+  };
+
+  const calculateAttendanceRate = (attendance) => {
+    const totalDays = Number(attendance?.total_working_days) || 0;
+    const actualDays = Number(attendance?.actual_working_days) || 0;
+
+    if (totalDays <= 0) {
+      return 0;
+    }
+
+    return Math.round((actualDays / totalDays) * 100);
+  };
+
+  const resolveAttendanceRateColor = (rate) => {
+    if (rate >= 90) {
+      return 'success';
+    }
+    if (rate >= 75) {
+      return 'warning';
+    }
+    return 'danger';
   };
 
   const handleEmployeeSearchChange = (event) => {
@@ -200,6 +452,10 @@ const AttendanceList = () => {
     setPendingDeleteAttendance(null);
     setDeletingAttendanceId(null);
   };
+
+  const syncConfirmPeriodInfo = pendingSyncPeriod
+    ? resolvePeriodLabel(pendingSyncPeriod)
+    : null;
 
   const handleOpenEditModal = (attendance) => {
     if (!attendance) {
@@ -537,29 +793,116 @@ const AttendanceList = () => {
     <CRow>
       <CCol xs={12}>
         <CCard className="mb-4">
-          <CCardHeader>
-            <CRow className="align-items-center">
-              <CCol>
-                <strong>Attendance Management</strong>
+          <CCardHeader className="bg-white border-bottom-0 pb-0">
+            <div className="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+              <div>
+                <h4 className="mb-1">Attendance Management</h4>
+                <p className="text-medium-emphasis mb-0">
+                  Track working days, identify gaps, and keep payroll inputs aligned.
+                </p>
+              </div>
+              <div className="d-flex flex-wrap gap-2 justify-content-lg-end">
+                <CButton color="primary" onClick={handleOpenAddModal}>
+                  <CIcon icon={cilPlus} className="me-1" />
+                  Add Attendance
+                </CButton>
+                <CButton
+                  color="info"
+                  variant="outline"
+                  onClick={handleOpenSyncModal}
+                >
+                  <CIcon icon={cilLoopCircular} className="me-1" />
+                  Sync External
+                </CButton>
+                <CButton
+                  color="secondary"
+                  variant="outline"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  <CIcon icon={cilFilter} className="me-1" />
+                  {showFilters ? 'Hide Filters' : 'Show Filters'}
+                </CButton>
+              </div>
+            </div>
+          </CCardHeader>
+          <CCardBody className="pt-4">
+            <CRow className="g-3 mb-4">
+              <CCol sm={6} lg={3}>
+                <div className="border rounded-3 p-3 h-100 bg-light">
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <div className="bg-primary bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center">
+                      <CIcon icon={cilPeople} className="text-primary" />
+                    </div>
+                    <div>
+                      <div className="text-uppercase text-medium-emphasis small">Team Coverage</div>
+                      <div className="fs-5 fw-semibold">
+                        {summaryMetrics.uniqueEmployees.toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="small text-medium-emphasis">
+                    {totalRecords.toLocaleString('id-ID')} attendance entries recorded.
+                  </div>
+                </div>
               </CCol>
-              <CCol xs="auto">
-                <div className="d-flex gap-2">
-                  <CButton color="primary" onClick={handleOpenAddModal}>
-                    Add Attendance
-                  </CButton>
-                  <CButton
-                    color="secondary"
-                    variant="outline"
-                    onClick={() => setShowFilters(!showFilters)}
-                  >
-                    <CIcon icon={cilFilter} className="me-1" />
-                    {showFilters ? 'Hide Filters' : 'Show Filters'}
-                  </CButton>
+              <CCol sm={6} lg={3}>
+                <div className="border rounded-3 p-3 h-100 bg-light">
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <div className="bg-info bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center">
+                      <CIcon icon={cilCalendar} className="text-info" />
+                    </div>
+                    <div>
+                      <div className="text-uppercase text-medium-emphasis small">Working Days</div>
+                      <div className="fs-5 fw-semibold">
+                        {summaryMetrics.totalWorkingDays.toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="small text-medium-emphasis">
+                    {summaryMetrics.actualWorkingDays.toLocaleString('id-ID')} days confirmed as attended.
+                  </div>
+                </div>
+              </CCol>
+              <CCol sm={6} lg={3}>
+                <div className="border rounded-3 p-3 h-100 bg-light">
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <div className="bg-success bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center">
+                      <CIcon icon={cilSpeedometer} className="text-success" />
+                    </div>
+                    <div>
+                      <div className="text-uppercase text-medium-emphasis small">Attendance Rate</div>
+                      <div className="fs-5 fw-semibold">
+                        {summaryMetrics.attendanceRate}%
+                      </div>
+                    </div>
+                  </div>
+                  <div className="small text-medium-emphasis">
+                    Actual vs scheduled presence across the current view.
+                  </div>
+                  <CProgress thin className="mt-2">
+                    <CProgressBar color="success" value={summaryMetrics.attendanceRate} />
+                  </CProgress>
+                </div>
+              </CCol>
+              <CCol sm={6} lg={3}>
+                <div className="border rounded-3 p-3 h-100 bg-light">
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                      <div className="bg-warning bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center">
+                      <CIcon icon={cilWarning} className="text-warning" />
+                    </div>
+                    <div>
+                      <div className="text-uppercase text-medium-emphasis small">Absent Days</div>
+                      <div className="fs-5 fw-semibold">
+                        {summaryMetrics.absentDays.toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="small text-medium-emphasis">
+                    Monitor outstanding absences before payroll processing.
+                  </div>
                 </div>
               </CCol>
             </CRow>
-          </CCardHeader>
-          <CCardBody>
             {successMessage && (
               <CAlert color="success" dismissible onClose={() => setSuccessMessage('')} className="mb-4">
                 {successMessage}
@@ -567,23 +910,23 @@ const AttendanceList = () => {
             )}
             {/* Search Form */}
             <CForm onSubmit={handleSearchSubmit} className="mb-4">
-              <CRow>
-                <CCol md={6} className="mb-3">
+              <CRow className="g-3 align-items-md-end">
+                <CCol md={6}>
                   <CInputGroup>
                     <CInputGroupText>
                       <CIcon icon={cilSearch} />
                     </CInputGroupText>
                     <CFormInput
                       type="text"
-                      placeholder="Search by employee name..."
+                      placeholder="Search by employee, period, or keyword"
                       value={searchTerm}
                       onChange={handleSearchInputChange}
                       ref={searchInputRef}
                     />
                   </CInputGroup>
                 </CCol>
-                <CCol md={6} className="mb-3">
-                  <div className="d-grid d-md-flex gap-2">
+                <CCol md={6}>
+                  <div className="d-grid gap-2 d-md-flex justify-content-md-end">
                     <CButton type="submit" color="primary">
                       <CIcon icon={cilSearch} className="me-1" />
                       Search
@@ -594,6 +937,33 @@ const AttendanceList = () => {
                   </div>
                 </CCol>
               </CRow>
+
+              <CCollapse visible={showFilters} className="mt-3">
+                <CRow className="g-3">
+                  <CCol md={6}>
+                    <CFormInput
+                      type="text"
+                      placeholder="Payroll Period (YYYYMM)"
+                      value={filters.payroll_periode}
+                      onChange={(e) => handleFilterChange('payroll_periode', e.target.value)}
+                    />
+                    <div className="small text-medium-emphasis mt-1">
+                      Example: enter 202501 to focus on January 2025 records.
+                    </div>
+                  </CCol>
+                  <CCol md={6}>
+                    <CFormInput
+                      type="text"
+                      placeholder="Employee ID"
+                      value={filters.employee_id}
+                      onChange={(e) => handleFilterChange('employee_id', e.target.value)}
+                    />
+                    <div className="small text-medium-emphasis mt-1">
+                      Narrow results to a specific employee identifier.
+                    </div>
+                  </CCol>
+                </CRow>
+              </CCollapse>
             </CForm>
 
             {attendances.length > 0 ? (
@@ -603,64 +973,94 @@ const AttendanceList = () => {
                     <CTableRow>
                       <CTableHeaderCell>Employee</CTableHeaderCell>
                       <CTableHeaderCell>Period</CTableHeaderCell>
-                      <CTableHeaderCell>Working Days</CTableHeaderCell>
-                      <CTableHeaderCell>Absent Days</CTableHeaderCell>
+                      <CTableHeaderCell>Scheduled Days</CTableHeaderCell>
                       <CTableHeaderCell>Actual Days</CTableHeaderCell>
-                      <CTableHeaderCell>Created At</CTableHeaderCell>
+                      <CTableHeaderCell>Absent Days</CTableHeaderCell>
+                      <CTableHeaderCell>Attendance Rate</CTableHeaderCell>
+                      <CTableHeaderCell>Recorded</CTableHeaderCell>
                       <CTableHeaderCell className="text-center">Actions</CTableHeaderCell>
                     </CTableRow>
                   </CTableHead>
                   <CTableBody>
-                    {attendances.map((attendance) => (
-                      <CTableRow key={attendance.attendance_id}>
-                        <CTableDataCell>
-                          <div>
-                            <strong>{attendance.employee?.name || 'N/A'}</strong>
-                            <div className="small text-medium-emphasis">
-                              ID: {attendance.employee_id}
+                    {attendances.map((attendance) => {
+                      const scheduledDays = Number(attendance.total_working_days) || 0;
+                      const actualDays = Number(attendance.actual_working_days) || 0;
+                      const absentDays = Number(attendance.absent_days) || 0;
+                      const periodLabel = resolvePeriodLabel(attendance.payroll_periode);
+                      const attendanceRate = calculateAttendanceRate(attendance);
+                      const attendanceRateColor = resolveAttendanceRateColor(attendanceRate);
+                      const hasAbsence = absentDays > 0;
+                      const employeeNik = attendance.employee?.nik;
+
+                      return (
+                        <CTableRow key={attendance.attendance_id}>
+                          <CTableDataCell>
+                            <div className="fw-semibold">{attendance.employee?.name || 'N/A'}</div>
+                            <div className="small text-medium-emphasis">Employee ID: {attendance.employee_id}</div>
+                            {employeeNik && (
+                              <CBadge color="info" className="mt-2">
+                                NIK {employeeNik}
+                              </CBadge>
+                            )}
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            <div className="fw-semibold">{periodLabel.formatted}</div>
+                            <div className="small text-medium-emphasis">{periodLabel.raw}</div>
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            <div className="fw-semibold">{scheduledDays.toLocaleString('id-ID')}</div>
+                            <div className="small text-medium-emphasis">Scheduled</div>
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            <div className="fw-semibold text-success">{actualDays.toLocaleString('id-ID')}</div>
+                            <div className="small text-medium-emphasis">Recorded</div>
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            <div className="fw-semibold">{absentDays.toLocaleString('id-ID')}</div>
+                            <CBadge color={hasAbsence ? 'warning' : 'success'} className="mt-2">
+                              {hasAbsence ? 'Needs review' : 'Clear'}
+                            </CBadge>
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            <div className="fw-semibold">{attendanceRate}%</div>
+                            <CProgress thin className="mt-2">
+                              <CProgressBar color={attendanceRateColor} value={attendanceRate} />
+                            </CProgress>
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            <div className="fw-semibold">{formatCreatedAt(attendance.created_at)}</div>
+                            {attendance.updated_at && (
+                              <div className="small text-medium-emphasis">
+                                Updated {formatCreatedAt(attendance.updated_at)}
+                              </div>
+                            )}
+                          </CTableDataCell>
+                          <CTableDataCell className="text-center">
+                            <div className="d-flex gap-2 justify-content-center">
+                              <CButton
+                                size="sm"
+                                color="info"
+                                variant="outline"
+                                onClick={() => handleOpenEditModal(attendance)}
+                              >
+                                <CIcon icon={cilPen} />
+                                <span className="visually-hidden">Update attendance</span>
+                              </CButton>
+                              <CButton
+                                size="sm"
+                                color="danger"
+                                variant="outline"
+                                disabled={deletingAttendanceId === attendance.attendance_id}
+                                onClick={() => handleRequestDeleteAttendance(attendance)}
+                              >
+                                <CIcon icon={cilTrash} />
+                                <span className="visually-hidden">Delete attendance</span>
+                              </CButton>
                             </div>
-                          </div>
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          {attendance.payroll_periode || '-'}
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          {attendance.total_working_days || 0}
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          {attendance.absent_days || 0}
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          {attendance.actual_working_days || 0}
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          {new Date(attendance.created_at).toLocaleDateString('id-ID')}
-                        </CTableDataCell>
-                        <CTableDataCell className="text-center">
-                          <div className="d-flex gap-2 justify-content-center">
-                            <CButton
-                              size="sm"
-                              color="info"
-                              variant="outline"
-                              onClick={() => handleOpenEditModal(attendance)}
-                            >
-                              <CIcon icon={cilPen} />
-                              <span className="visually-hidden">Update attendance</span>
-                            </CButton>
-                            <CButton
-                              size="sm"
-                              color="danger"
-                              variant="outline"
-                              disabled={deletingAttendanceId === attendance.attendance_id}
-                              onClick={() => handleRequestDeleteAttendance(attendance)}
-                            >
-                              <CIcon icon={cilTrash} />
-                              <span className="visually-hidden">Delete attendance</span>
-                            </CButton>
-                          </div>
-                        </CTableDataCell>
-                      </CTableRow>
-                    ))}
+                          </CTableDataCell>
+                        </CTableRow>
+                      );
+                    })}
                   </CTableBody>
                 </CTable>
                 
@@ -731,11 +1131,105 @@ const AttendanceList = () => {
               </>
             ) : (
               <div className="text-center py-5">
-                <p className="text-medium-emphasis">
-                  No attendance records found.
+                <p className="text-medium-emphasis mb-3">
+                  No attendance records match the current filters. Adjust your criteria or add a new record.
                 </p>
+                <CButton color="primary" variant="outline" onClick={handleOpenAddModal}>
+                  <CIcon icon={cilPlus} className="me-1" />
+                  Create Attendance Record
+                </CButton>
               </div>
             )}
+          <CModal visible={showSyncModal} onClose={handleCloseSyncModal} backdrop="static">
+            <CForm onSubmit={handleSyncSubmit}>
+              <CModalHeader>
+                <CModalTitle>Sync External Attendance</CModalTitle>
+              </CModalHeader>
+              <CModalBody>
+                {syncError && (
+                  <CAlert color="danger" className="mb-3">
+                    {syncError}
+                  </CAlert>
+                )}
+                <div className="mb-3">
+                  <CFormLabel htmlFor="attendance-sync-period">Payroll Period</CFormLabel>
+                  <CFormInput
+                    id="attendance-sync-period"
+                    type="text"
+                    value={syncPeriod}
+                    onChange={(e) => setSyncPeriod(e.target.value)}
+                    placeholder="Enter period (e.g., 202509)"
+                    disabled={syncLoading}
+                    autoComplete="off"
+                  />
+                  <div className="small text-medium-emphasis mt-1">
+                    Provide the payroll period in YYYYMM format that you want to synchronize from the external system.
+                  </div>
+                </div>
+              </CModalBody>
+              <CModalFooter>
+                <CButton
+                  color="secondary"
+                  variant="outline"
+                  onClick={handleCloseSyncModal}
+                  disabled={syncLoading}
+                >
+                  Cancel
+                </CButton>
+                <CButton
+                  color="info"
+                  type="submit"
+                  disabled={syncLoading}
+                >
+                  Continue
+                </CButton>
+              </CModalFooter>
+            </CForm>
+          </CModal>
+
+          <CModal
+            visible={showSyncConfirm}
+            onClose={handleCancelSyncConfirm}
+            backdrop="static"
+          >
+            <CModalHeader>
+              <CModalTitle>Confirm Synchronization</CModalTitle>
+            </CModalHeader>
+            <CModalBody>
+              <p className="mb-3">
+                Synchronize attendance data for period{' '}
+                <strong>{syncConfirmPeriodInfo?.formatted || pendingSyncPeriod || '-'}</strong>?
+              </p>
+              <p className="text-medium-emphasis mb-0">
+                This action will trigger an external sync request and may take a few moments to complete.
+              </p>
+            </CModalBody>
+            <CModalFooter>
+              <CButton
+                color="secondary"
+                variant="outline"
+                onClick={handleCancelSyncConfirm}
+                disabled={syncLoading}
+              >
+                Back
+              </CButton>
+              <CButton
+                color="info"
+                onClick={handleConfirmSync}
+                disabled={syncLoading}
+              >
+                {syncLoading ? (
+                  <>
+                    <CSpinner size="sm" className="me-2" />
+                    Syncing...
+                  </>
+                ) : (
+                  'Confirm & Sync'
+                )}
+              </CButton>
+            </CModalFooter>
+          </CModal>
+
           <CModal visible={showAddModal} onClose={handleCloseAddModal} backdrop="static">
             <CForm onSubmit={handleAddSubmit}>
               <CModalHeader>

@@ -89,7 +89,8 @@ export const API_ENDPOINTS = {
     LIST: `${API_BASE}/attendance`,
     CREATE: `${API_BASE}/attendance/store`,
     UPDATE: `${API_BASE}/attendance/update`,
-    DELETE: (id) => `${API_BASE}/attendance/delete/${id}`
+    DELETE: (id) => `${API_BASE}/attendance/delete/${id}`,
+    SYNC_EXTERNAL: `${API_BASE}/attendance/sync-external`
   },
 
   // External API Endpoints

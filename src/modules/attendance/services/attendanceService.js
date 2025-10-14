@@ -12,7 +12,9 @@ class AttendanceService {
       const {
         page = 1,
         rows = 10,
-        search = ''
+        search = '',
+        payroll_periode = '',
+        employee_id = ''
       } = params;
 
       // Build query parameters
@@ -21,6 +23,8 @@ class AttendanceService {
       queryParams.append('rows', rows);
       
       if (search) queryParams.append('search', search);
+      if (payroll_periode) queryParams.append('payroll_periode', payroll_periode);
+      if (employee_id) queryParams.append('employee_id', employee_id);
 
       const url = `${API_ENDPOINTS.ATTENDANCE.LIST}?${queryParams.toString()}`;
       
@@ -68,6 +72,15 @@ class AttendanceService {
   async deleteAttendance(attendanceId) {
     try {
       const response = await apiClient.delete(API_ENDPOINTS.ATTENDANCE.DELETE(attendanceId));
+      return response?.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async syncExternal(payload) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.ATTENDANCE.SYNC_EXTERNAL, payload);
       return response?.data;
     } catch (error) {
       throw this.handleError(error);

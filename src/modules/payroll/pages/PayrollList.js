@@ -2,7 +2,7 @@
 // PAYROLL LIST PAGE
 // ========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CRow,
@@ -34,17 +34,30 @@ import {
   CModalFooter,
   CToast,
   CToastBody,
-  CToastHeader
+  CToastHeader,
+  CCollapse
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilPlus, cilTrash, cilPrint, cilMoney, cilSearch, cilFilter, cilCloudDownload, cilViewModule, cilLoopCircular, cilEnvelopeClosed } from '@coreui/icons';
+import {
+  cilPlus,
+  cilTrash,
+  cilPrint,
+  cilMoney,
+  cilSearch,
+  cilFilter,
+  cilCloudDownload,
+  cilViewModule,
+  cilLoopCircular,
+  cilEnvelopeClosed,
+  cilCheckCircle,
+  cilWarning
+} from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
+import { formatPayrollPeriod } from '../../../utils/formatters';
 import payrollService from '../services/payrollService';
 import employeeService from '../../employees/services/employeeService';
 import companyService from '../../companies/services/companyService';
 import config from '../../../config/environment';
-
-console.log('PayrollService imported:', payrollService);
 
 // Error Boundary Component
 class PayrollListErrorBoundary extends React.Component {
@@ -127,6 +140,46 @@ const PayrollList = () => {
     color: 'success' // success, danger, warning, info
   });
 
+  const summaryMetrics = useMemo(() => {
+    if (!Array.isArray(payrolls) || payrolls.length === 0) {
+      return {
+        totalNetPay: 0,
+        printedCount: 0,
+        emailedCount: 0,
+        pendingSlipCount: 0
+      };
+    }
+
+    return payrolls.reduce(
+      (acc, payroll) => {
+        const netPay = Number(payroll?.net_pay ?? 0);
+        if (!Number.isNaN(netPay)) {
+          acc.totalNetPay += netPay;
+        }
+
+        if (payroll?.is_printed) {
+          acc.printedCount += 1;
+        }
+
+        if (payroll?.is_emailed) {
+          acc.emailedCount += 1;
+        }
+
+        if (!payroll?.slip_url) {
+          acc.pendingSlipCount += 1;
+        }
+
+        return acc;
+      },
+      {
+        totalNetPay: 0,
+        printedCount: 0,
+        emailedCount: 0,
+        pendingSlipCount: 0
+      }
+    );
+  }, [payrolls]);
+
   const getCompanyLabel = (payroll) => {
     if (!payroll || typeof payroll !== 'object') {
       return '-';
@@ -156,7 +209,6 @@ const PayrollList = () => {
 
   const loadPayrolls = async () => {
     try {
-      console.log('Loading payrolls, page:', currentPage, 'params:', searchParams);
       setLoading(true);
       
       const serviceParams = {
@@ -164,24 +216,13 @@ const PayrollList = () => {
         rows: pageSize,
         ...searchParams
       };
-      
-      console.log('Service params being sent:', serviceParams);
-      
+
       const response = await payrollService.getPayrolls(serviceParams);
-      console.log('Payroll response:', response);
-      
+
       if (response) {
-        console.log('Response data:', response);
-        // The service already parsed the response structure
         setPayrolls(response.data || []);
-        // Ensure we're correctly setting totalPages and totalRecords from the service response
-        const pages = response.pages || 1;
-        console.log('Setting totalPages:', pages);
-        const total = response.total || 0;
-        setTotalPages(pages);
-        setTotalRecords(total);
-        console.log('Setting totalPages:', pages);
-        console.log('Setting totalRecords:', total);
+        setTotalPages(response.pages || 1);
+        setTotalRecords(response.total || 0);
       } else {
         setPayrolls([]);
         setTotalPages(1);
@@ -205,14 +246,12 @@ const PayrollList = () => {
   }, [currentPage, pageSize]);
 
   const handlePageChange = (page) => {
-    console.log('Changing page to:', page);
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
   };
 
   const handleSearchChange = (field, value) => {
-    console.log('Search param changed:', field, '=', value);
     setSearchParams(prev => ({
       ...prev,
       [field]: value
@@ -222,7 +261,6 @@ const PayrollList = () => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    console.log('Search form submitted with params:', searchParams);
     setCurrentPage(1);
     loadPayrolls();
   };
@@ -252,9 +290,6 @@ const PayrollList = () => {
 
   // Handle Generate Payroll
   const handleGeneratePayroll = () => {
-    console.log('Opening generate payroll modal');
-    console.log('Employee service:', employeeService);
-    console.log('Employee service methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(employeeService)));
     setSelectedEmployee(null);
     setPayrollPeriod('');
     setPayrollError('');
@@ -267,15 +302,12 @@ const PayrollList = () => {
   const handleModalClose = () => {
     // Prevent modal from closing when clicking outside
     // But allow closing via Cancel or Generate buttons
-    console.log('Modal close requested - preventing close on backdrop click');
     // Do nothing to prevent closing
     // Modal can only be closed via explicit button actions
   };
 
   // Search employees for the payroll modal
   const searchEmployeesForPayroll = async (searchTerm) => {
-    console.log('Searching employees with term:', searchTerm);
-    console.log('Employee service:', employeeService);
     if (!searchTerm.trim()) {
       setEmployeeSearchResults([]);
       return;
@@ -283,7 +315,6 @@ const PayrollList = () => {
 
     try {
       setSearchingEmployees(true);
-      console.log('Calling employeeService.getAllEmployees');
       
       // Temporary workaround to test if the method exists
       if (typeof employeeService.getAllEmployees !== 'function') {
@@ -292,27 +323,22 @@ const PayrollList = () => {
         // Try to call the method directly from the prototype
         const proto = Object.getPrototypeOf(employeeService);
         if (proto.getAllEmployees && typeof proto.getAllEmployees === 'function') {
-          console.log('Found method in prototype, calling it');
           const employees = await proto.getAllEmployees.call(employeeService, searchTerm);
-          console.log('Employees found (from prototype):', employees);
           setEmployeeSearchResults(employees || []);
           return;
         } else {
           // Fallback: use the existing getEmployees method with search
-          console.log('Using fallback method: getEmployees with search');
           const response = await employeeService.getEmployees({ 
             page: 1, 
             rows: 10, 
             search: searchTerm 
           });
-          console.log('Fallback response:', response);
           setEmployeeSearchResults(response.data || []);
           return;
         }
       }
       
       const employees = await employeeService.getAllEmployees(searchTerm);
-      console.log('Employees found:', employees);
       setEmployeeSearchResults(employees || []);
     } catch (error) {
       console.error('Error searching employees:', error);
@@ -909,6 +935,29 @@ const generatePayroll = async (e) => {
     return new Date(dateString).toLocaleDateString('id-ID');
   };
 
+  const resolvePeriodLabel = (period) => {
+    const normalized = String(period || '').trim();
+
+    if (/^\d{6}$/.test(normalized)) {
+      return {
+        formatted: formatPayrollPeriod(normalized),
+        raw: normalized
+      };
+    }
+
+    if (normalized) {
+      return {
+        formatted: normalized,
+        raw: normalized
+      };
+    }
+
+    return {
+      formatted: '-',
+      raw: '-'
+    };
+  };
+
   // Add this function to handle page size change
   const handlePageSizeChange = (size) => {
     setPageSize(size);
@@ -940,97 +989,150 @@ const generatePayroll = async (e) => {
       <CRow>
         <CCol xs={12}>
           <CCard className="mb-4">
-            <CCardHeader>
-              <CRow className="align-items-center">
-                <CCol>
-                  <strong>Payroll Management</strong>
-                </CCol>
-                <CCol xs="auto">
-                  <CButton 
-                    color="secondary" 
-                    variant="outline" 
-                    className="me-2"
+            <CCardHeader className="bg-white border-bottom-0 pb-0">
+              <div className="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                <div>
+                  <h4 className="mb-1">Payroll Management</h4>
+                  <p className="text-medium-emphasis mb-0">
+                    Monitor payroll runs, slips, and communication in one place.
+                  </p>
+                </div>
+                <div className="d-flex flex-wrap gap-2 justify-content-lg-end">
+                  <CButton
+                    color="secondary"
+                    variant="outline"
                     onClick={() => setShowFilters(!showFilters)}
                   >
                     <CIcon icon={cilFilter} className="me-1" />
                     {showFilters ? 'Hide Filters' : 'Show Filters'}
                   </CButton>
-                  <CButton 
+                  <CButton
                     color="primary"
                     onClick={handleGeneratePayroll}
-                    className="me-2"
                   >
                     <CIcon icon={cilPlus} className="me-1" />
                     Generate Payroll
                   </CButton>
-                  <CButton 
+                  <CButton
                     color="info"
                     onClick={openMassGenerateModal}
-                    className="me-2"
                   >
                     <CIcon icon={cilPlus} className="me-1" />
                     Generate Mass Payroll
                   </CButton>
-                  <CButton 
+                  <CButton
                     color="success"
                     onClick={openMassSlipModal}
-                    className="me-2"
                   >
                     <CIcon icon={cilPlus} className="me-1" />
                     Generate Mass Slip
                   </CButton>
-                  <CButton 
+                  <CButton
                     color="warning"
                     onClick={openMassEmailModal}
-                    className="me-2"
                   >
                     <CIcon icon={cilEnvelopeClosed} className="me-1" />
                     Send Mass Email
                   </CButton>
-                  <CButton 
+                  <CButton
                     color="dark"
                     onClick={openDownloadModal}
                   >
                     <CIcon icon={cilCloudDownload} className="me-1" />
                     Download Payroll
                   </CButton>
+                </div>
+              </div>
+            </CCardHeader>
+            <CCardBody className="pt-4">
+              <CRow className="g-3 mb-4">
+                <CCol sm={6} lg={3}>
+                  <div className="border rounded-3 p-3 h-100 bg-light">
+                    <div className="d-flex align-items-center gap-2 mb-2">
+                      <div className="bg-primary bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center">
+                        <CIcon icon={cilViewModule} className="text-primary" />
+                      </div>
+                      <div>
+                        <div className="text-uppercase text-medium-emphasis small">Records</div>
+                        <div className="fs-5 fw-semibold">{totalRecords.toLocaleString('id-ID')}</div>
+                      </div>
+                    </div>
+                    <div className="small text-medium-emphasis">
+                      Viewing {payrolls.length.toLocaleString('id-ID')} record(s) on this page.
+                    </div>
+                  </div>
+                </CCol>
+                <CCol sm={6} lg={3}>
+                  <div className="border rounded-3 p-3 h-100 bg-light">
+                    <div className="d-flex align-items-center gap-2 mb-2">
+                      <div className="bg-success bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center">
+                        <CIcon icon={cilMoney} className="text-success" />
+                      </div>
+                      <div>
+                        <div className="text-uppercase text-medium-emphasis small">Net Pay (Current View)</div>
+                        <div className="fs-5 fw-semibold">{formatCurrency(summaryMetrics.totalNetPay)}</div>
+                      </div>
+                    </div>
+                    <div className="small text-medium-emphasis">
+                      Aggregated from payrolls displayed in the table.
+                    </div>
+                  </div>
+                </CCol>
+                <CCol sm={6} lg={3}>
+                  <div className="border rounded-3 p-3 h-100 bg-light">
+                    <div className="d-flex align-items-center gap-2 mb-2">
+                      <div className="bg-info bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center">
+                        <CIcon icon={cilCheckCircle} className="text-info" />
+                      </div>
+                      <div>
+                        <div className="text-uppercase text-medium-emphasis small">Slip Status</div>
+                        <div className="fs-5 fw-semibold">
+                          {summaryMetrics.printedCount.toLocaleString('id-ID')} printed
+                        </div>
+                      </div>
+                    </div>
+                    <div className="small text-medium-emphasis">
+                      {summaryMetrics.printedCount.toLocaleString('id-ID')} of {payrolls.length.toLocaleString('id-ID')} payrolls have printable slips.
+                    </div>
+                  </div>
+                </CCol>
+                <CCol sm={6} lg={3}>
+                  <div className="border rounded-3 p-3 h-100 bg-light">
+                    <div className="d-flex align-items-center gap-2 mb-2">
+                      <div className="bg-warning bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center">
+                        <CIcon icon={cilWarning} className="text-warning" />
+                      </div>
+                      <div>
+                        <div className="text-uppercase text-medium-emphasis small">Pending Actions</div>
+                        <div className="fs-5 fw-semibold">
+                          {summaryMetrics.pendingSlipCount.toLocaleString('id-ID')}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="small text-medium-emphasis">
+                      {summaryMetrics.emailedCount.toLocaleString('id-ID')} emailed | {summaryMetrics.pendingSlipCount.toLocaleString('id-ID')} awaiting slip file.
+                    </div>
+                  </div>
                 </CCol>
               </CRow>
-            </CCardHeader>
-            <CCardBody>
-              {/* Error Alert */}
-              {/* {error && (
-                <CAlert color="danger" className="mb-3">
-                  {error}
-                  <CButton
-                    color="danger"
-                    variant="outline"
-                    size="sm"
-                    className="ms-2"
-                    onClick={() => setError('')}
-                  >
-                    Dismiss
-                  </CButton>
-                </CAlert>
-              )} */}
-              {/* Search Form */}
+
               <CForm onSubmit={handleSearchSubmit} className="mb-4">
-                <CRow>
-                  <CCol md={6} className="mb-3">
+                <CRow className="g-3 align-items-md-end">
+                  <CCol md={6}>
                     <CInputGroup>
                       <CInputGroupText>
                         <CIcon icon={cilSearch} />
                       </CInputGroupText>
                       <CFormInput
                         type="text"
-                        placeholder="Search by period or employee name..."
+                        placeholder="Search by period, employee, or keyword"
                         value={searchParams.search}
                         onChange={(e) => handleSearchChange('search', e.target.value)}
                       />
                     </CInputGroup>
                   </CCol>
-                  <CCol md={6} className="mb-3">
-                    <div className="d-grid d-md-flex gap-2">
+                  <CCol md={6}>
+                    <div className="d-grid gap-2 d-md-flex justify-content-md-end">
                       <CButton type="submit" color="primary">
                         <CIcon icon={cilSearch} className="me-1" />
                         Search
@@ -1041,18 +1143,18 @@ const generatePayroll = async (e) => {
                     </div>
                   </CCol>
                 </CRow>
-                
-                {showFilters && (
-                  <CRow>
-                    <CCol md={6} className="mb-3">
+
+                <CCollapse visible={showFilters} className="mt-3">
+                  <CRow className="g-3">
+                    <CCol md={6}>
                       <CFormInput
                         type="text"
-                        placeholder="Payroll Period (e.g., 2023-01)"
+                        placeholder="Payroll Period (YYYYMM)"
                         value={searchParams.payroll_periode}
                         onChange={(e) => handleSearchChange('payroll_periode', e.target.value)}
                       />
                     </CCol>
-                    <CCol md={6} className="mb-3">
+                    <CCol md={6}>
                       <CFormInput
                         type="text"
                         placeholder="Employee Name"
@@ -1061,7 +1163,7 @@ const generatePayroll = async (e) => {
                       />
                     </CCol>
                   </CRow>
-                )}
+                </CCollapse>
               </CForm>
 
               {payrolls.length > 0 ? (
@@ -1078,134 +1180,145 @@ const generatePayroll = async (e) => {
                       </CTableRow>
                     </CTableHead>
                     <CTableBody>
-                      {payrolls.map((payroll) => (
-                        <CTableRow key={payroll.payroll_id}>
-                          <CTableDataCell>
-                            <div>
-                              <strong>{payroll.employee?.name || 'N/A'}</strong>
+                      {payrolls.map((payroll) => {
+                        const periodInfo = resolvePeriodLabel(payroll.payroll_periode);
+                        const companyLabel = getCompanyLabel(payroll);
+                        const hasSlipFile = Boolean(payroll.slip_url);
+
+                        return (
+                          <CTableRow key={payroll.payroll_id}>
+                            <CTableDataCell>
+                              <div className="fw-semibold">{payroll.employee?.name || 'N/A'}</div>
                               <div className="small text-medium-emphasis">
                                 {payroll.employee?.nik || 'No NIK'}
                               </div>
                               <div className="small text-medium-emphasis">
                                 {payroll.employee?.email || 'No email'}
                               </div>
-                            </div>
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            <div>
-                              <strong>{getCompanyLabel(payroll)}</strong>
+                            </CTableDataCell>
+                            <CTableDataCell>
+                              <div className="fw-semibold">{companyLabel}</div>
                               {payroll.employee?.company?.email && (
                                 <div className="small text-medium-emphasis">
                                   {payroll.employee.company.email}
                                 </div>
                               )}
-                            </div>
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            {payroll.payroll_periode || '-'}
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            <strong>{formatCurrency(payroll.net_pay)}</strong>
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            <CBadge color={payroll.is_printed ? 'success' : 'secondary'} className="me-1">
-                              {payroll.is_printed ? 'Printed' : 'Not Printed'}
-                            </CBadge>
-                            <CBadge color={payroll.is_emailed ? 'success' : 'secondary'}>
-                              {payroll.is_emailed ? 'Emailed' : 'Not Emailed'}
-                            </CBadge>
-                          </CTableDataCell>
-                        <CTableDataCell>
-                          <Link to={`/payroll/${payroll.payroll_id}`}>
-                            <CButton
-                              color="info"
-                              size="sm"
-                              className="me-1"
-                              title="View Payroll Detail"
-                            >
-                              <CIcon icon={cilViewModule} size="sm" />
-                            </CButton>
-                          </Link>
-                          <CButton
-                            color="primary"
-                            size="sm"
-                            className="me-1"
-                            title="Generate Payroll"
-                            onClick={() => openRowPayrollModal(payroll)}
-                          >
-                            <CIcon icon={cilMoney} size="sm" />
-                          </CButton>
-                          <CButton
-                            color="primary"
-                            size="sm"
-                            className="me-1"
-                            title="Generate Slip"
-                            onClick={() => openRegenerateModal(payroll)}
-                          >
-                            <CIcon icon={cilLoopCircular} size="sm" />
-                          </CButton>
-                          {payroll.slip_url ? (
-                          <CButton
-                            color="primary"
-                            size="sm"
-                            className="me-1"
-                                title="Download Slip"
-                                component="a"
-                                href={payroll.slip_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <CIcon icon={cilCloudDownload} size="sm" />
-                              </CButton>
-                            ) : (
-                              <CButton
-                                color="primary"
-                                size="sm"
-                                className="me-1"
-                                title="Download Slip"
-                                disabled
-                              >
-                                <CIcon icon={cilCloudDownload} size="sm" />
-                              </CButton>
-                            )}
-                            <CButton
-                              color="success"
-                              size="sm"
-                              className="me-1"
-                              title="Print Slip"
-                              disabled={!payroll.is_printed}
-                            >
-                              <CIcon icon={cilPrint} size="sm" />
-                            </CButton>
-                            <CButton
-                              color="warning"
-                              size="sm"
-                              className="me-1"
-                              title="Email Slip"
-                              disabled={
-                                !payroll.is_printed ||
-                                !payroll.slip_url ||
-                                emailingSlipId === payroll.payroll_id
-                              }
-                              onClick={() => confirmEmailSlip(payroll)}
-                            >
-                              {emailingSlipId === payroll.payroll_id ? (
-                                <CSpinner size="sm" />
-                              ) : (
-                                <CIcon icon={cilEnvelopeClosed} size="sm" />
+                            </CTableDataCell>
+                            <CTableDataCell>
+                              <div className="fw-semibold">{periodInfo.formatted}</div>
+                              <div className="small text-medium-emphasis">{periodInfo.raw}</div>
+                            </CTableDataCell>
+                            <CTableDataCell>
+                              <strong>{formatCurrency(payroll.net_pay)}</strong>
+                              {payroll.updated_at && (
+                                <div className="small text-medium-emphasis">
+                                  Updated {formatDate(payroll.updated_at)}
+                                </div>
                               )}
-                            </CButton>
-                            <CButton
-                              color="danger"
-                              size="sm"
-                              title="Delete Payroll (disabled)"
-                              disabled
-                            >
-                              <CIcon icon={cilTrash} size="sm" />
-                            </CButton>
-                          </CTableDataCell>
-                        </CTableRow>
-                      ))}
+                            </CTableDataCell>
+                            <CTableDataCell>
+                              <div className="d-flex flex-wrap gap-2">
+                                <CBadge color={payroll.is_printed ? 'success' : 'warning'}>
+                                  {payroll.is_printed ? 'Slip ready' : 'Slip pending'}
+                                </CBadge>
+                                <CBadge color={hasSlipFile ? 'info' : 'secondary'}>
+                                  {hasSlipFile ? 'File available' : 'No file'}
+                                </CBadge>
+                                <CBadge color={payroll.is_emailed ? 'success' : 'secondary'}>
+                                  {payroll.is_emailed ? 'Email sent' : 'Email pending'}
+                                </CBadge>
+                              </div>
+                            </CTableDataCell>
+                            <CTableDataCell>
+                              <div className="d-flex flex-wrap gap-2">
+                                <Link
+                                  to={`/payroll/${payroll.payroll_id}`}
+                                  className="text-decoration-none"
+                                >
+                                  <CButton
+                                    color="info"
+                                    size="sm"
+                                    title="View payroll detail"
+                                  >
+                                    <CIcon icon={cilViewModule} size="sm" />
+                                  </CButton>
+                                </Link>
+                                <CButton
+                                  color="primary"
+                                  size="sm"
+                                  title="Generate payroll"
+                                  onClick={() => openRowPayrollModal(payroll)}
+                                >
+                                  <CIcon icon={cilMoney} size="sm" />
+                                </CButton>
+                                <CButton
+                                  color="primary"
+                                  size="sm"
+                                  title="Generate slip"
+                                  onClick={() => openRegenerateModal(payroll)}
+                                >
+                                  <CIcon icon={cilLoopCircular} size="sm" />
+                                </CButton>
+                                {hasSlipFile ? (
+                                  <CButton
+                                    color="primary"
+                                    size="sm"
+                                    title="Download slip"
+                                    component="a"
+                                    href={payroll.slip_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <CIcon icon={cilCloudDownload} size="sm" />
+                                  </CButton>
+                                ) : (
+                                  <CButton
+                                    color="primary"
+                                    size="sm"
+                                    title="Download slip"
+                                    disabled
+                                  >
+                                    <CIcon icon={cilCloudDownload} size="sm" />
+                                  </CButton>
+                                )}
+                                <CButton
+                                  color="success"
+                                  size="sm"
+                                  title="Print slip"
+                                  disabled={!payroll.is_printed || !hasSlipFile}
+                                >
+                                  <CIcon icon={cilPrint} size="sm" />
+                                </CButton>
+                                <CButton
+                                  color="warning"
+                                  size="sm"
+                                  title="Email slip"
+                                  disabled={
+                                    !payroll.is_printed ||
+                                    !hasSlipFile ||
+                                    emailingSlipId === payroll.payroll_id
+                                  }
+                                  onClick={() => confirmEmailSlip(payroll)}
+                                >
+                                  {emailingSlipId === payroll.payroll_id ? (
+                                    <CSpinner size="sm" />
+                                  ) : (
+                                    <CIcon icon={cilEnvelopeClosed} size="sm" />
+                                  )}
+                                </CButton>
+                                <CButton
+                                  color="danger"
+                                  size="sm"
+                                  title="Delete payroll (coming soon)"
+                                  disabled
+                                >
+                                  <CIcon icon={cilTrash} size="sm" />
+                                </CButton>
+                              </div>
+                            </CTableDataCell>
+                          </CTableRow>
+                        );
+                      })}
                     </CTableBody>
                   </CTable>
                   
@@ -1277,8 +1390,8 @@ const generatePayroll = async (e) => {
                 </>
               ) : (
                 <div className="text-center py-5">
-                  <p className="text-medium-emphasis">
-                    No payrolls found.
+                  <p className="text-medium-emphasis mb-3">
+                    No payrolls match the current filters. Adjust the search criteria or create a new payroll.
                   </p>
                   <Link to="/payroll/generate">
                     <CButton color="primary">

@@ -28,6 +28,9 @@ const ComponentList = React.lazy(() => import('../modules/components/pages/Compo
 const ComponentDetail = React.lazy(() => import('../modules/components/pages/ComponentDetail'));
 const ComponentForm = React.lazy(() => import('../modules/components/pages/ComponentForm'));
 
+// System Settings
+const SettingList = React.lazy(() => import('../modules/settings/pages/SettingList'));
+
 // Payroll Management
 const PayrollList = React.lazy(() => {
   return import('../modules/payroll/pages/PayrollList');
@@ -158,6 +161,15 @@ const payrollRoutes = [
     name: 'Edit Component',
     element: ComponentForm,
     requiredPermissions: [PERMISSIONS.COMPONENTS_UPDATE]
+  },
+
+  // System Settings Routes
+  {
+    path: '/settings',
+    name: 'System Settings',
+    element: SettingList,
+    exact: true,
+    requiredPermissions: [PERMISSIONS.SYSTEM_SETTINGS]
   },
 
   // Payroll Management Routes

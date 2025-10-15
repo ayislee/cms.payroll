@@ -9,7 +9,8 @@ import {
   cilCash,
   cilCalendar,
   cilChart,
-  cilClipboard
+  cilClipboard,
+  cilCog
 } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 
@@ -95,6 +96,16 @@ const _nav = [
         to: '/reports/employee'
       }
     ]
+  },
+  {
+    component: CNavTitle,
+    name: 'System Administration'
+  },
+  {
+    component: CNavItem,
+    name: 'System Settings',
+    to: '/settings',
+    icon: <CIcon icon={cilCog} customClassName="nav-icon" />
   },
   {
     component: CNavItem,

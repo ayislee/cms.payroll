@@ -172,6 +172,16 @@ const config = {
       health: '/external/health'
     },
 
+    // System Settings
+    settings: {
+      list: '/setting',
+      detail: '/setting/:id',
+      create: '/setting',
+      update: '/setting/:id',
+      delete: '/setting/:id',
+      toggleStatus: '/setting/:id/toggle-status'
+    },
+
     // System Health
     health: '/health'
   }

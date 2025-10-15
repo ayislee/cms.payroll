@@ -103,6 +103,16 @@ export const API_ENDPOINTS = {
     HEALTH: `${API_BASE}/external/health`
   },
 
+  // System Settings
+  SETTINGS: {
+    LIST: `${API_BASE}/setting`,
+    DETAIL: (id) => `${API_BASE}/setting/${id}`,
+    CREATE: `${API_BASE}/setting`,
+    UPDATE: (id) => `${API_BASE}/setting/${id}`,
+    DELETE: (id) => `${API_BASE}/setting/${id}`,
+    TOGGLE_STATUS: (id) => `${API_BASE}/setting/${id}/toggle-status`
+  },
+
   // System Health
   HEALTH: `${API_BASE}/health`
 };

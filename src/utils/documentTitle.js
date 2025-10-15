@@ -29,6 +29,7 @@ export const getPageTitle = (pathname) => {
     '/users': 'User Management',
     '/components': 'Payroll Components',
     '/components/create': 'Add Component',
+    '/settings': 'System Settings',
     '/payroll': 'Payroll Management',
     '/payroll/generate': 'Generate Payroll',
     '/payroll/mass-generate': 'Mass Generate Payroll',

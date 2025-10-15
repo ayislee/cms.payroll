@@ -1,4 +1,4 @@
-﻿// ========================================
+// ========================================
 // USER FORM PAGE - PROFESSIONAL VERSION
 // ========================================
 
@@ -142,12 +142,16 @@ const UserForm = () => {
   useDocumentTitle(isEdit ? 'Edit User' : 'Add User');
 
   const [formData, setFormData] = useState({
+    firstname: '',
+    lastname: '',
     name: '',
     email: '',
     phone: '',
     type: USER_ROLES.USER,
     company_id: '',
-    is_active: true
+    is_active: true,
+    password: '',
+    password_confirmation: ''
   });
   const [companyOptions, setCompanyOptions] = useState([]);
   const [companyFallbackOption, setCompanyFallbackOption] = useState(null);
@@ -190,6 +194,12 @@ const UserForm = () => {
       const userData = await userService.getUserById(id);
       const formatted = userService.formatUserListItem(userData);
       const typeValue = formatted.type || USER_ROLES.USER;
+      const nameParts = (formatted.name || '').trim().split(' ').filter(Boolean);
+      const derivedFirstname = userData?.firstname ?? nameParts[0] ?? '';
+      const derivedLastname =
+        userData?.lastname ??
+        (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
+      const cleanedPhone = formatted.phone && formatted.phone !== '-' ? formatted.phone : '';
 
       if (typeValue === USER_ROLES.USER && formatted.company_id) {
         setCompanyFallbackOption({
@@ -201,12 +211,16 @@ const UserForm = () => {
       }
 
       setFormData({
-        name: formatted.name || '',
+        firstname: derivedFirstname,
+        lastname: derivedLastname,
+        name: formatted.name || `${derivedFirstname} ${derivedLastname}`.trim(),
         email: formatted.email || '',
-        phone: formatted.phone || '',
+        phone: cleanedPhone || '',
         type: typeValue,
         company_id: typeValue === USER_ROLES.USER && formatted.company_id ? String(formatted.company_id) : '',
-        is_active: formatted.is_active
+        is_active: formatted.is_active,
+        password: '',
+        password_confirmation: ''
       });
     } catch (err) {
       console.error('Error loading user:', err);
@@ -245,17 +259,41 @@ const UserForm = () => {
     const { name, value, type, checked } = event.target;
     const nextValue = type === 'checkbox' ? checked : value;
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: nextValue
-    }));
-
-    if (validationErrors[name]) {
-      setValidationErrors((prev) => ({
+    setFormData((prev) => {
+      const updated = {
         ...prev,
-        [name]: undefined
-      }));
+        [name]: nextValue
+      };
+
+      if (name === 'firstname' || name === 'lastname') {
+        const first = name === 'firstname' ? nextValue : updated.firstname;
+        const last = name === 'lastname' ? nextValue : updated.lastname;
+        updated.name = `${first || ''} ${last || ''}`.trim();
+      }
+
+      return updated;
+    });
+
+    const fieldsToClear = [name];
+    if (name === 'firstname' || name === 'lastname') {
+      fieldsToClear.push('name');
     }
+
+    setValidationErrors((prev) => {
+      if (!prev || Object.keys(prev).length === 0) return prev;
+
+      const nextErrors = { ...prev };
+      let changed = false;
+
+      fieldsToClear.forEach((field) => {
+        if (nextErrors[field]) {
+          delete nextErrors[field];
+          changed = true;
+        }
+      });
+
+      return changed ? nextErrors : prev;
+    });
 
     if (error) {
       setError('');
@@ -297,16 +335,56 @@ const UserForm = () => {
       setError('');
       setValidationErrors({});
 
-      const validation = userService.validateUserData(formData);
+      const payload = {
+        ...formData,
+        name: `${formData.firstname || ''} ${formData.lastname || ''}`.trim()
+      };
+
+      const fieldErrors = {};
+
+      if (!formData.firstname?.trim()) {
+        fieldErrors.firstname = 'Nama depan wajib diisi';
+      }
+
+      if (!formData.lastname?.trim()) {
+        fieldErrors.lastname = 'Nama belakang wajib diisi';
+      }
+
+      if (!isEdit) {
+        if (!formData.password?.trim()) {
+          fieldErrors.password = 'Password wajib diisi';
+        } else if (formData.password.length < 8) {
+          fieldErrors.password = 'Password minimal 8 karakter';
+        }
+
+        if (!formData.password_confirmation?.trim()) {
+          fieldErrors.password_confirmation = 'Konfirmasi password wajib diisi';
+        } else if (formData.password_confirmation !== formData.password) {
+          fieldErrors.password_confirmation = 'Konfirmasi password tidak cocok';
+        }
+      }
+
+      if (Object.keys(fieldErrors).length > 0) {
+        setSaving(false);
+        setValidationErrors(fieldErrors);
+        return;
+      }
+
+      const validation = userService.validateUserData(payload);
       if (!validation.isValid) {
+        setSaving(false);
         setValidationErrors(validation.errors);
         return;
       }
 
+      const requestData = { ...payload };
+
       if (isEdit) {
-        await userService.updateUser(id, formData);
+        delete requestData.password;
+        delete requestData.password_confirmation;
+        await userService.updateUser(id, requestData);
       } else {
-        await userService.createUser(formData);
+        await userService.createUser(requestData);
       }
 
       setSaving(false);
@@ -480,21 +558,40 @@ const UserForm = () => {
 
               <CForm onSubmit={handleSubmit}>
                 <CRow className="g-3">
-                  <CCol md={6}>
-                    <CFormLabel htmlFor="name">Nama Pengguna <span className="text-danger">*</span></CFormLabel>
-                    <CFormInput
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="Masukkan nama lengkap"
-                      className={validationErrors.name ? 'is-invalid' : ''}
-                      disabled={saving}
-                    />
-                    {validationErrors.name && (
-                      <div className="invalid-feedback">{validationErrors.name}</div>
-                    )}
-                  </CCol>
+                    <CCol md={6}>
+                      <CFormLabel htmlFor="firstname">
+                        Nama Depan <span className="text-danger">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        id="firstname"
+                        name="firstname"
+                        value={formData.firstname}
+                        onChange={handleInputChange}
+                        placeholder="Masukkan nama depan"
+                        className={validationErrors.firstname ? 'is-invalid' : ''}
+                        disabled={saving}
+                      />
+                      {validationErrors.firstname && (
+                        <div className="invalid-feedback">{validationErrors.firstname}</div>
+                      )}
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormLabel htmlFor="lastname">
+                        Nama Belakang <span className="text-danger">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        id="lastname"
+                        name="lastname"
+                        value={formData.lastname}
+                        onChange={handleInputChange}
+                        placeholder="Masukkan nama belakang"
+                        className={validationErrors.lastname ? 'is-invalid' : ''}
+                        disabled={saving}
+                      />
+                      {validationErrors.lastname && (
+                        <div className="invalid-feedback">{validationErrors.lastname}</div>
+                      )}
+                    </CCol>
                   <CCol md={6}>
                     <CFormLabel htmlFor="email">Email <span className="text-danger">*</span></CFormLabel>
                     <CFormInput
@@ -570,10 +667,51 @@ const UserForm = () => {
                     </CCol>
                   )}
 
+                  {!isEdit && (
+                    <>
+                      <CCol md={6}>
+                        <CFormLabel htmlFor="password">
+                          Password <span className="text-danger">*</span>
+                        </CFormLabel>
+                        <CFormInput
+                          id="password"
+                          name="password"
+                          type="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          placeholder="Minimal 8 karakter"
+                          className={validationErrors.password ? 'is-invalid' : ''}
+                          disabled={saving}
+                        />
+                        {validationErrors.password && (
+                          <div className="invalid-feedback">{validationErrors.password}</div>
+                        )}
+                      </CCol>
+                      <CCol md={6}>
+                        <CFormLabel htmlFor="password_confirmation">
+                          Konfirmasi Password <span className="text-danger">*</span>
+                        </CFormLabel>
+                        <CFormInput
+                          id="password_confirmation"
+                          name="password_confirmation"
+                          type="password"
+                          value={formData.password_confirmation}
+                          onChange={handleInputChange}
+                          placeholder="Ulangi password"
+                          className={validationErrors.password_confirmation ? 'is-invalid' : ''}
+                          disabled={saving}
+                        />
+                        {validationErrors.password_confirmation && (
+                          <div className="invalid-feedback">{validationErrors.password_confirmation}</div>
+                        )}
+                      </CCol>
+                    </>
+                  )}
+
                   <CCol md={6}>
                     <CFormLabel className="d-block">Status Akun</CFormLabel>
                     <CFormCheck
-                      type="switch"
+                      type="checkbox"
                       id="is_active"
                       name="is_active"
                       label={formData.is_active ? 'Pengguna aktif' : 'Pengguna nonaktif'}

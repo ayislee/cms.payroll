@@ -20,7 +20,7 @@ export const API_ENDPOINTS = {
   USERS: {
     LIST: `${API_BASE}/user`,
     DETAIL: (id) => `${API_BASE}/user/${id}`,
-    CREATE: `${API_BASE}/user`,
+    CREATE: `${API_BASE}/user/store`,
     UPDATE: (id) => `${API_BASE}/user/${id}`,
     DELETE: (id) => `${API_BASE}/user/${id}`,
     TOGGLE_STATUS: (id) => `${API_BASE}/user/${id}/toggle-status`,

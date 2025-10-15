@@ -10,6 +10,7 @@ yarn.lock
 
 # production
 /build
+/src/config/environment.js
 
 # misc
 .eslintcache

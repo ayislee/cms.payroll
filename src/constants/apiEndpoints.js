@@ -84,6 +84,11 @@ export const API_ENDPOINTS = {
     DELETE: (id) => `${API_BASE}/payroll/${id}`
   },
 
+  // Dashboard Endpoints
+  DASHBOARD: {
+    OVERVIEW: `${API_BASE}/dashboard/overview`
+  },
+
   // Attendance Management Endpoints
   ATTENDANCE: {
     LIST: `${API_BASE}/attendance`,

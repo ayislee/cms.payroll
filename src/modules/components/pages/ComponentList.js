@@ -2,7 +2,7 @@
 // COMPONENT LIST PAGE
 // ========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CRow,
@@ -25,7 +25,13 @@ import {
   CModalHeader,
   CModalTitle,
   CModalBody,
-  CModalFooter
+  CModalFooter,
+  CWidgetStatsA,
+  CForm,
+  CInputGroup,
+  CInputGroupText,
+  CFormInput,
+  CFormSelect
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import {
@@ -35,12 +41,17 @@ import {
   cilPencil,
   cilTrash,
   cilMagnifyingGlass,
-  cilReload
+  cilReload,
+  cilCheckCircle,
+  cilXCircle,
+  cilList,
+  cilFilter
 } from '@coreui/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import componentService from '../services/componentService';
+import { formatNumber } from '../../../utils/formatters';
 
 const ComponentList = () => {
   const { hasPermission } = useAuth();
@@ -52,6 +63,10 @@ const ComponentList = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const loadComponents = async () => {
     try {
@@ -91,11 +106,65 @@ const ComponentList = () => {
     loadComponents();
   }, []);
 
+  const categories = useMemo(() => {
+    const uniqueCategories = new Set(
+      components.map((component) => component.category).filter(Boolean)
+    );
+    return Array.from(uniqueCategories).sort((a, b) => a.localeCompare(b));
+  }, [components]);
+
+  const filteredComponents = useMemo(() => {
+    return components.filter((component) => {
+      const matchesSearch =
+        !searchTerm ||
+        `${component.name || ''} ${component.code || ''} ${component.description || ''}`
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
+
+      const matchesType =
+        typeFilter === 'all' || (component.type || '').toLowerCase() === typeFilter.toLowerCase();
+
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && component.is_active) ||
+        (statusFilter === 'inactive' && !component.is_active);
+
+      const matchesCategory =
+        categoryFilter === 'all' ||
+        (component.category || '').toLowerCase() === categoryFilter.toLowerCase();
+
+      return matchesSearch && matchesType && matchesStatus && matchesCategory;
+    });
+  }, [components, searchTerm, typeFilter, statusFilter, categoryFilter]);
+
+  const componentStats = useMemo(() => {
+    const total = components.length;
+    const active = components.filter((component) => component.is_active).length;
+    const inactive = total - active;
+    const earning = components.filter((component) => component.type === 'Earning').length;
+    const deduction = components.filter((component) => component.type === 'Deduction').length;
+
+    return {
+      total,
+      active,
+      inactive,
+      earning,
+      deduction
+    };
+  }, [components]);
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setTypeFilter('all');
+    setStatusFilter('all');
+    setCategoryFilter('all');
+  };
+
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: '300px' }}>
         <CSpinner color="primary" />
-        <span className="ms-2">Loading components...</span>
+        <span className="ms-2">Memuat daftar komponen...</span>
       </div>
     );
   }
@@ -104,7 +173,7 @@ const ComponentList = () => {
     <>
       <CRow>
         <CCol xs={12}>
-          <CCard className="mb-4">
+          <CCard className="mb-4 border-0 shadow-sm">
             <CCardHeader>
               <CRow className="align-items-center">
                 <CCol>
@@ -112,53 +181,156 @@ const ComponentList = () => {
                     <CIcon icon={cilSettings} className="me-2" />
                     Payroll Components
                   </h4>
+                  <p className="text-medium-emphasis mb-0">
+                    Kelola komponen perhitungan payroll dengan ringkas dan mudah diatur.
+                  </p>
                 </CCol>
-                  <CCol xs="auto">
-                    <CButtonGroup>
-                      <CButton
-                        color="secondary"
-                        variant="outline"
-                        onClick={loadComponents}
-                        disabled={loading}
-                      >
-                        <CIcon icon={cilReload} className={loading ? 'spin' : ''} />
-                        {loading ? ' Loading...' : ' Refresh'}
-                      </CButton>
-                      {hasPermission(PERMISSIONS.COMPONENTS_CREATE) && (
-                        <Link to="/components/create">
-                          <CButton color="primary">
-                            <CIcon icon={cilPlus} className="me-1" />
-                            Add Component
-                          </CButton>
-                        </Link>
-                      )}
-                    </CButtonGroup>
-                  </CCol>
+                <CCol xs="auto">
+                  <CButtonGroup>
+                    <CButton
+                      color="secondary"
+                      variant="outline"
+                      onClick={loadComponents}
+                      disabled={loading}
+                    >
+                      <CIcon icon={cilReload} className={loading ? 'spin' : ''} />
+                      {loading ? ' Memuat...' : ' Refresh'}
+                    </CButton>
+                    {hasPermission(PERMISSIONS.COMPONENTS_CREATE) && (
+                      <Link to="/components/create">
+                        <CButton color="primary">
+                          <CIcon icon={cilPlus} className="me-1" />
+                          Tambah Komponen
+                        </CButton>
+                      </Link>
+                    )}
+                  </CButtonGroup>
+                </CCol>
               </CRow>
             </CCardHeader>
 
-            <CCardBody>
+            <CCardBody className="pt-4">
               {error && (
-                <CAlert color="danger" className="mb-3">
+                <CAlert color="danger" className="mb-4">
                   {error}
                 </CAlert>
               )}
 
-              <CTable responsive hover>
-                <CTableHead>
+              <CRow className="g-3 mb-4">
+                <CCol sm={6} xl={3}>
+                  <CWidgetStatsA
+                    color="primary"
+                    className="h-100 shadow-sm"
+                    value={formatNumber(componentStats.total)}
+                    title="Total Komponen"
+                    action={<CIcon icon={cilList} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+                <CCol sm={6} xl={3}>
+                  <CWidgetStatsA
+                    color="success"
+                    className="h-100 shadow-sm"
+                    value={formatNumber(componentStats.active)}
+                    title="Aktif"
+                    action={<CIcon icon={cilCheckCircle} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+                <CCol sm={6} xl={3}>
+                  <CWidgetStatsA
+                    color="danger"
+                    className="h-100 shadow-sm"
+                    value={formatNumber(componentStats.inactive)}
+                    title="Tidak Aktif"
+                    action={<CIcon icon={cilXCircle} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+                <CCol sm={6} xl={3}>
+                  <CWidgetStatsA
+                    color="info"
+                    className="h-100 shadow-sm"
+                    value={`${formatNumber(componentStats.earning)} / ${formatNumber(componentStats.deduction)}`}
+                    title="Earning / Deduction"
+                    action={<CIcon icon={cilFilter} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+              </CRow>
+
+              <CCard className="border-0 shadow-sm mb-4">
+                <CCardHeader className="bg-light">
+                  <CIcon icon={cilFilter} className="me-2" />
+                  Filter & Pencarian
+                </CCardHeader>
+                <CCardBody>
+                  <CForm>
+                    <CRow className="g-3 align-items-end">
+                      <CCol lg={4}>
+                        <label className="form-label">Pencarian</label>
+                        <CInputGroup>
+                          <CInputGroupText>
+                            <CIcon icon={cilMagnifyingGlass} />
+                          </CInputGroupText>
+                          <CFormInput
+                            placeholder="Cari nama, kode, atau deskripsi..."
+                            value={searchTerm}
+                            onChange={(event) => setSearchTerm(event.target.value)}
+                          />
+                        </CInputGroup>
+                      </CCol>
+                      <CCol lg={3}>
+                        <label className="form-label">Tipe Komponen</label>
+                        <CFormSelect value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                          <option value="all">Semua Tipe</option>
+                          <option value="Earning">Earning</option>
+                          <option value="Deduction">Deduction</option>
+                        </CFormSelect>
+                      </CCol>
+                      <CCol lg={3}>
+                        <label className="form-label">Status</label>
+                        <CFormSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                          <option value="all">Semua Status</option>
+                          <option value="active">Aktif</option>
+                          <option value="inactive">Tidak Aktif</option>
+                        </CFormSelect>
+                      </CCol>
+                      <CCol lg={2}>
+                        <label className="form-label">Kategori</label>
+                        <CFormSelect
+                          value={categoryFilter}
+                          onChange={(event) => setCategoryFilter(event.target.value)}
+                        >
+                          <option value="all">Semua</option>
+                          {categories.map((category) => (
+                            <option key={category} value={category}>
+                              {category}
+                            </option>
+                          ))}
+                        </CFormSelect>
+                      </CCol>
+                      <CCol xs="auto">
+                        <CButton color="secondary" variant="outline" className="mt-3" onClick={resetFilters}>
+                          Reset Filter
+                        </CButton>
+                      </CCol>
+                    </CRow>
+                  </CForm>
+                </CCardBody>
+              </CCard>
+
+              <CTable responsive hover align="middle" className="mb-0">
+                <CTableHead className="text-medium-emphasis">
                   <CTableRow>
                     <CTableHeaderCell width="60">ID</CTableHeaderCell>
-                    <CTableHeaderCell>Code</CTableHeaderCell>
-                    <CTableHeaderCell>Name</CTableHeaderCell>
-                    <CTableHeaderCell>Type</CTableHeaderCell>
-                    <CTableHeaderCell>Category</CTableHeaderCell>
+                    <CTableHeaderCell>Kode</CTableHeaderCell>
+                    <CTableHeaderCell>Nama Komponen</CTableHeaderCell>
+                    <CTableHeaderCell>Tipe</CTableHeaderCell>
+                    <CTableHeaderCell>Kategori</CTableHeaderCell>
                     <CTableHeaderCell>Status</CTableHeaderCell>
-                    <CTableHeaderCell width="120">Actions</CTableHeaderCell>
+                    <CTableHeaderCell width="120">Aksi</CTableHeaderCell>
                   </CTableRow>
                 </CTableHead>
                 <CTableBody>
-                  {components.length > 0 ? (
-                    components.map((component) => (
+                  {filteredComponents.length > 0 ? (
+                    filteredComponents.map((component) => (
                       <CTableRow key={component.main_component_id}>
                         <CTableDataCell>
                           <CBadge color="info">#{component.main_component_id}</CBadge>
@@ -182,19 +354,19 @@ const ComponentList = () => {
                         </CTableDataCell>
                         <CTableDataCell>
                           <CBadge color={component.is_active ? 'success' : 'secondary'}>
-                            {component.is_active ? 'Active' : 'Inactive'}
+                            {component.is_active ? 'Aktif' : 'Tidak Aktif'}
                           </CBadge>
                         </CTableDataCell>
                         <CTableDataCell>
                           <CButtonGroup size="sm">
                             <Link to={`/components/${component.main_component_id}`}>
-                              <CButton color="info" variant="outline" size="sm" title="View Details">
+                              <CButton color="info" variant="outline" size="sm" title="Lihat Detail">
                                 <CIcon icon={cilInfo} />
                               </CButton>
                             </Link>
                             {hasPermission(PERMISSIONS.COMPONENTS_UPDATE) && (
                               <Link to={`/components/${component.main_component_id}/edit`}>
-                                <CButton color="warning" variant="outline" size="sm" title="Edit Component">
+                                <CButton color="warning" variant="outline" size="sm" title="Ubah Komponen">
                                   <CIcon icon={cilPencil} />
                                 </CButton>
                               </Link>
@@ -204,7 +376,7 @@ const ComponentList = () => {
                                 color="danger"
                                 variant="outline"
                                 size="sm"
-                                title="Delete Component"
+                                title="Hapus Komponen"
                                 onClick={() => handleDelete(component)}
                               >
                                 <CIcon icon={cilTrash} />
@@ -218,12 +390,12 @@ const ComponentList = () => {
                     <CTableRow>
                       <CTableDataCell colSpan="7" className="text-center py-4">
                         <div className="text-medium-emphasis">
-                          No components found
+                          Tidak ada komponen yang sesuai dengan filter saat ini.
                           <br />
                           {hasPermission(PERMISSIONS.COMPONENTS_CREATE) && (
                             <Link to="/components/create">
                               <CButton color="primary" size="sm" className="mt-2">
-                                Add First Component
+                                Tambah Komponen Pertama
                               </CButton>
                             </Link>
                           )}
@@ -241,18 +413,18 @@ const ComponentList = () => {
       {/* Delete Confirmation Modal */}
       <CModal visible={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
         <CModalHeader>
-          <CModalTitle>Confirm Delete</CModalTitle>
+          <CModalTitle>Konfirmasi Hapus</CModalTitle>
         </CModalHeader>
         <CModalBody>
           {componentToDelete && (
             <>
-              Are you sure you want to delete component:
+              Apakah Anda yakin ingin menghapus komponen:
               <br />
               <strong>{componentToDelete.name}</strong> ({componentToDelete.code})?
               <br />
               <br />
               <small className="text-danger">
-                This action cannot be undone. This may affect existing payroll calculations.
+                Tindakan ini tidak dapat dibatalkan dan berpotensi mempengaruhi perhitungan payroll yang berjalan.
               </small>
             </>
           )}
@@ -263,7 +435,7 @@ const ComponentList = () => {
             onClick={() => setShowDeleteModal(false)}
             disabled={deleting}
           >
-            Cancel
+            Batal
           </CButton>
           <CButton
             color="danger"
@@ -273,10 +445,10 @@ const ComponentList = () => {
             {deleting ? (
               <>
                 <CSpinner size="sm" className="me-2" />
-                Deleting...
+                Menghapus...
               </>
             ) : (
-              'Delete'
+              'Hapus'
             )}
           </CButton>
         </CModalFooter>

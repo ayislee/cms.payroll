@@ -2,7 +2,7 @@
 // DASHBOARD PAGE COMPONENT
 // ========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   CRow,
   CCol,
@@ -10,335 +10,606 @@ import {
   CCardBody,
   CCardHeader,
   CWidgetStatsA,
-  CProgress,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CBadge,
-  CButton,
   CSpinner,
-  CAlert
+  CAlert,
+  CForm,
+  CFormInput,
+  CButton,
+  CFormSelect
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import {
   cilPeople,
   cilCash,
-  cilBuilding,
   cilClipboard,
   cilCalendar,
-  cilChart
+  cilChart,
+  cilCheckCircle,
+  cilWarning,
+  cilBuilding
 } from '@coreui/icons';
+import { CChartLine, CChartBar } from '@coreui/react-chartjs';
+import { getStyle } from '@coreui/utils';
 import { useAuth } from '../../../hooks/useAuth';
-import { formatCurrency, formatPayrollPeriod, getCurrentPayrollPeriod } from '../../../utils/formatters';
+import { formatCurrency, formatPayrollPeriod } from '../../../utils/formatters';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import apiClient from '../../../utils/apiClient';
 import { API_ENDPOINTS } from '../../../constants/apiEndpoints';
 import { useDocumentTitle } from '../../../utils/documentTitle';
+import companyService from '../../companies/services/companyService';
+
+const formatPeriodLabel = (period, fallbackLabel) => {
+  if (!period) {
+    return fallbackLabel || '-';
+  }
+
+  const formatted = formatPayrollPeriod(period);
+  if (formatted && formatted !== '-') {
+    return formatted;
+  }
+
+  return fallbackLabel || period;
+};
+
+const toLocaleNumber = (value) => Number(value || 0).toLocaleString('id-ID');
 
 const Dashboard = () => {
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Set document title
-  useDocumentTitle('Dashboard');
-  const [dashboardData, setDashboardData] = useState({
-    stats: {
-      totalEmployees: 0,
-      totalCompanies: 0,
-      thisMonthPayroll: 0,
-      pendingPayrolls: 0
-    },
-    recentPayrolls: [],
-    monthlyStats: {
-      processed: 0,
-      pending: 0,
-      total: 0
-    }
+  const [overview, setOverview] = useState(null);
+  const [activeFilters, setActiveFilters] = useState({
+    companyId: '',
+    periodStart: '',
+    periodEnd: ''
   });
+  const [filterForm, setFilterForm] = useState({
+    companyId: '',
+    periodStart: '',
+    periodEnd: ''
+  });
+  const [companyOptions, setCompanyOptions] = useState([
+    { value: '', label: 'Semua Perusahaan' }
+  ]);
+  const [companyOptionsLoading, setCompanyOptionsLoading] = useState(false);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  useDocumentTitle('Dashboard');
 
-  const loadDashboardData = async () => {
+  const canViewEmployees = hasPermission(PERMISSIONS.EMPLOYEES_VIEW);
+  const canViewPayroll = hasPermission(PERMISSIONS.PAYROLL_VIEW);
+  const canViewAttendance = hasPermission(PERMISSIONS.ATTENDANCE_VIEW);
+
+  const loadOverviewData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
 
-      // Load dashboard statistics
-      const stats = await Promise.allSettled([
-        hasPermission(PERMISSIONS.EMPLOYEES_VIEW) ? loadEmployeeStats() : Promise.resolve(0),
-        hasPermission(PERMISSIONS.COMPANIES_VIEW) ? loadCompanyStats() : Promise.resolve(0),
-        hasPermission(PERMISSIONS.PAYROLL_VIEW) ? loadPayrollStats() : Promise.resolve({ total: 0, pending: 0 }),
-        hasPermission(PERMISSIONS.PAYROLL_VIEW) ? loadRecentPayrolls() : Promise.resolve([])
-      ]);
+      const params = new URLSearchParams();
+      if (activeFilters.companyId) {
+        params.append('company_id', activeFilters.companyId);
+      }
+      if (activeFilters.periodStart) {
+        params.append('period_start', activeFilters.periodStart);
+      }
+      if (activeFilters.periodEnd) {
+        params.append('period_end', activeFilters.periodEnd);
+      }
 
-      const [employeeStats, companyStats, payrollStats, recentPayrolls] = stats.map(
-        result => result.status === 'fulfilled' ? result.value : null
-      );
+      const queryString = params.toString();
+      const url = queryString
+        ? `${API_ENDPOINTS.DASHBOARD.OVERVIEW}?${queryString}`
+        : API_ENDPOINTS.DASHBOARD.OVERVIEW;
 
-      setDashboardData({
-        stats: {
-          totalEmployees: employeeStats || 0,
-          totalCompanies: companyStats || 0,
-          thisMonthPayroll: payrollStats?.total || 0,
-          pendingPayrolls: payrollStats?.pending || 0
-        },
-        recentPayrolls: recentPayrolls || [],
-        monthlyStats: {
-          processed: payrollStats?.processed || 0,
-          pending: payrollStats?.pending || 0,
-          total: payrollStats?.total || 0
-        }
-      });
+      const response = await apiClient.get(url);
 
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      setError('Failed to load dashboard data. Please try again.');
+      if (response?.status) {
+        setOverview(response.data);
+      } else {
+        throw new Error(response?.message || 'Gagal memuat data dashboard.');
+      }
+    } catch (err) {
+      console.error('Error loading dashboard overview:', err);
+      setOverview(null);
+      setError(err.message || 'Gagal memuat data dashboard.');
     } finally {
       setLoading(false);
     }
+  }, [activeFilters]);
+
+  useEffect(() => {
+    loadOverviewData();
+  }, [loadOverviewData]);
+
+  useEffect(() => {
+    const fetchCompanyOptions = async () => {
+      try {
+        setCompanyOptionsLoading(true);
+        const options = await companyService.getCompanyOptions();
+        const formattedOptions = Array.isArray(options)
+          ? options.map((option) => ({
+              value: String(option.value ?? ''),
+              label: option.label ?? String(option.value ?? '')
+            }))
+          : [];
+
+        setCompanyOptions([
+          { value: '', label: 'Semua Perusahaan' },
+          ...formattedOptions
+        ]);
+      } catch (err) {
+        console.error('Gagal memuat daftar perusahaan:', err);
+        setCompanyOptions([{ value: '', label: 'Semua Perusahaan' }]);
+      } finally {
+        setCompanyOptionsLoading(false);
+      }
+    };
+
+    fetchCompanyOptions();
+  }, []);
+
+  const handleFilterInputChange = (field) => (event) => {
+    const { value } = event.target;
+    setFilterForm((prev) => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  const loadEmployeeStats = async () => {
-    try {
-      const response = await apiClient.get(`${API_ENDPOINTS.EMPLOYEES.LIST}?limit=1`);
-      return response.data?.employees?.total || 0;
-    } catch (error) {
-      console.error('Error loading employee stats:', error);
+  const handleFilterApply = (event) => {
+    event.preventDefault();
+    const trimmedFilters = {
+      companyId: filterForm.companyId.trim(),
+      periodStart: filterForm.periodStart.trim(),
+      periodEnd: filterForm.periodEnd.trim()
+    };
+    setFilterForm(trimmedFilters);
+    setActiveFilters(trimmedFilters);
+  };
+
+  const handleFilterReset = () => {
+    const emptyFilters = {
+      companyId: '',
+      periodStart: '',
+      periodEnd: ''
+    };
+    setFilterForm(emptyFilters);
+    setActiveFilters(emptyFilters);
+  };
+
+  const employeesMetrics = overview?.metrics?.employees || {
+    total: 0,
+    active: 0,
+    inactive: 0
+  };
+
+  const payrollMetrics = overview?.metrics?.payroll || {
+    total_records: 0,
+    total_net_pay: 0,
+    period: null,
+    period_start: '',
+    period_end: '',
+    recent_paid_net_pay: []
+  };
+
+  const attendanceMetrics = overview?.metrics?.attendance || {
+    total_records: 0,
+    covered_employees: 0,
+    period_start: '',
+    period_end: '',
+    recent_periods: []
+  };
+
+  const periodRangeLabel = useMemo(() => {
+    const startLabel = formatPeriodLabel(overview?.period_start, 'Periode Awal');
+    const endLabel = formatPeriodLabel(overview?.period_end, 'Periode Akhir');
+    return `${startLabel} - ${endLabel}`;
+  }, [overview]);
+
+  const attendanceCoverage = useMemo(() => {
+    const covered = Number(overview?.metrics?.attendance?.covered_employees || 0);
+    const totalEmployees = Number(overview?.metrics?.employees?.total || 0);
+
+    if (!covered || !totalEmployees) {
       return 0;
     }
-  };
 
-  const loadCompanyStats = async () => {
-    try {
-      const response = await apiClient.get(`${API_ENDPOINTS.COMPANIES.LIST}?limit=1`);
-      return response.data?.companies?.total || 0;
-    } catch (error) {
-      console.error('Error loading company stats:', error);
-      return 0;
+    return Math.round((covered / totalEmployees) * 100);
+  }, [overview]);
+
+  const netPayChartData = useMemo(() => {
+    const recentNetPay = overview?.metrics?.payroll?.recent_paid_net_pay || [];
+    if (!recentNetPay.length) {
+      return null;
     }
-  };
 
-  const loadPayrollStats = async () => {
-    try {
-      const currentPeriod = getCurrentPayrollPeriod();
-      const [totalResponse, pendingResponse] = await Promise.all([
-        apiClient.get(`${API_ENDPOINTS.PAYROLL.LIST}?payroll_period=${currentPeriod}&limit=1`),
-        apiClient.get(`${API_ENDPOINTS.PAYROLL.LIST}?payroll_period=${currentPeriod}&is_printed=0&limit=1`)
-      ]);
+    const labels = recentNetPay.map((item, index) => {
+      const periodValue = item.payroll_period || item.period || '';
+      return formatPeriodLabel(periodValue, `Periode ${index + 1}`);
+    });
 
-      return {
-        total: totalResponse.data?.payrolls?.total || 0,
-        pending: pendingResponse.data?.payrolls?.total || 0,
-        processed: (totalResponse.data?.payrolls?.total || 0) - (pendingResponse.data?.payrolls?.total || 0)
-      };
-    } catch (error) {
-      console.error('Error loading payroll stats:', error);
-      return { total: 0, pending: 0, processed: 0 };
+    const dataPoints = recentNetPay.map((item) => Number(item.total_net_pay || 0));
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Total Net Pay',
+          data: dataPoints,
+          borderColor: getStyle('--cui-success'),
+          backgroundColor: `rgba(${getStyle('--cui-success-rgb')}, 0.2)`,
+          pointBackgroundColor: getStyle('--cui-success'),
+          fill: true,
+          tension: 0.4
+        }
+      ]
+    };
+  }, [overview]);
+
+  const attendanceChartData = useMemo(() => {
+    const recentPeriods = overview?.metrics?.attendance?.recent_periods || [];
+    if (!recentPeriods.length) {
+      return null;
     }
-  };
 
-  const loadRecentPayrolls = async () => {
-    try {
-      const response = await apiClient.get(`${API_ENDPOINTS.PAYROLL.LIST}?limit=5`);
-      return response.data?.payrolls?.data || [];
-    } catch (error) {
-      console.error('Error loading recent payrolls:', error);
-      return [];
-    }
-  };
+    const labels = recentPeriods.map((item, index) => {
+      const periodValue = item.period || item.payroll_period || '';
+      return formatPeriodLabel(periodValue, `Periode ${index + 1}`);
+    });
+
+    const totalRecordsData = recentPeriods.map((item) => Number(item.total_records || 0));
+    const coveredEmployeesData = recentPeriods.map((item) => Number(item.covered_employees || 0));
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Total Kehadiran',
+          data: totalRecordsData,
+          backgroundColor: `rgba(${getStyle('--cui-info-rgb')}, 0.6)`,
+          borderColor: getStyle('--cui-info'),
+          borderWidth: 1
+        },
+        {
+          label: 'Karyawan Tercakup',
+          data: coveredEmployeesData,
+          backgroundColor: `rgba(${getStyle('--cui-warning-rgb')}, 0.6)`,
+          borderColor: getStyle('--cui-warning'),
+          borderWidth: 1
+        }
+      ]
+    };
+  }, [overview]);
+
+  const lineChartOptions = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: getStyle('--cui-body-color')
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: getStyle('--cui-border-color-translucent'),
+            drawOnChartArea: false
+          },
+          ticks: {
+            color: getStyle('--cui-body-color')
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: getStyle('--cui-border-color-translucent')
+          },
+          ticks: {
+            color: getStyle('--cui-body-color')
+          }
+        }
+      },
+      elements: {
+        line: {
+          tension: 0.4,
+          borderWidth: 2
+        },
+        point: {
+          radius: 4,
+          hoverRadius: 6,
+          hitRadius: 10
+        }
+      }
+    }),
+    []
+  );
+
+  const barChartOptions = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: getStyle('--cui-body-color')
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: getStyle('--cui-border-color-translucent')
+          },
+          ticks: {
+            color: getStyle('--cui-body-color')
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: getStyle('--cui-border-color-translucent')
+          },
+          ticks: {
+            color: getStyle('--cui-body-color')
+          }
+        }
+      }
+    }),
+    []
+  );
 
   if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: '300px' }}>
-        <CSpinner color="primary" />
-        <span className="ms-2">Loading dashboard...</span>
+      <div className="text-center py-5">
+        <CSpinner color="primary" size="lg" />
+        <p className="text-medium-emphasis mt-3">Memuat data dashboard...</p>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <CAlert color="danger">
-        {error}
-        <div className="mt-2">
-          <CButton color="primary" size="sm" onClick={loadDashboardData}>
-            Retry
-          </CButton>
-        </div>
-      </CAlert>
-    );
-  }
-
-  const progressPercentage = dashboardData.stats.thisMonthPayroll > 0 
-    ? (dashboardData.monthlyStats.processed / dashboardData.stats.thisMonthPayroll) * 100 
-    : 0;
-
   return (
     <>
-      {/* Welcome Section */}
+      {error && (
+        <CAlert color="danger" className="mb-4">
+          {error}
+        </CAlert>
+      )}
+
       <CRow className="mb-4">
-        <CCol>
+        <CCol xs={12}>
           <CCard>
-            <CCardHeader>
-              <h4 className="mb-0">
-                Welcome back, {user?.firstname} {user?.lastname}!
-              </h4>
-            </CCardHeader>
+            <CCardHeader>Filter Dashboard</CCardHeader>
             <CCardBody>
-              <p className="text-medium-emphasis mb-0">
-                Here's what's happening with your payroll system for {formatPayrollPeriod(getCurrentPayrollPeriod())}.
-              </p>
+              <CForm onSubmit={handleFilterApply}>
+                <CRow className="g-3 align-items-end">
+                  <CCol md={4}>
+                    <label className="form-label">Company ID</label>
+                    <CFormSelect
+                      value={filterForm.companyId}
+                      onChange={handleFilterInputChange('companyId')}
+                      disabled={loading || companyOptionsLoading}
+                    >
+                      {companyOptions.map((option) => (
+                        <option key={option.value || 'all'} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </CFormSelect>
+                  </CCol>
+                  <CCol md={4}>
+                    <label className="form-label">Periode Mulai (YYYYMM)</label>
+                    <CFormInput
+                      value={filterForm.periodStart}
+                      onChange={handleFilterInputChange('periodStart')}
+                      placeholder="Contoh: 202501"
+                      maxLength={6}
+                      disabled={loading}
+                    />
+                  </CCol>
+                  <CCol md={4}>
+                    <label className="form-label">Periode Akhir (YYYYMM)</label>
+                    <CFormInput
+                      value={filterForm.periodEnd}
+                      onChange={handleFilterInputChange('periodEnd')}
+                      placeholder="Contoh: 202509"
+                      maxLength={6}
+                      disabled={loading}
+                    />
+                  </CCol>
+                  <CCol xs="auto" className="mt-3">
+                    <CButton type="submit" color="primary" className="me-2" disabled={loading}>
+                      Terapkan
+                    </CButton>
+                    <CButton
+                      type="button"
+                      color="secondary"
+                      variant="outline"
+                      onClick={handleFilterReset}
+                      disabled={loading}
+                    >
+                      Reset
+                    </CButton>
+                  </CCol>
+                </CRow>
+              </CForm>
             </CCardBody>
           </CCard>
         </CCol>
       </CRow>
 
-      {/* Statistics Cards */}
-      <CRow className="mb-4">
-        {hasPermission(PERMISSIONS.EMPLOYEES_VIEW) && (
-          <CCol sm={6} lg={3}>
-            <CWidgetStatsA
-              className="mb-4"
-              color="primary"
-              value={dashboardData.stats.totalEmployees.toLocaleString()}
-              title="Total Employees"
-              action={
-                <CIcon icon={cilPeople} height={52} className="text-white-50" />
-              }
-            />
-          </CCol>
-        )}
-
-        {hasPermission(PERMISSIONS.COMPANIES_VIEW) && (
-          <CCol sm={6} lg={3}>
-            <CWidgetStatsA
-              className="mb-4"
-              color="info"
-              value={dashboardData.stats.totalCompanies.toLocaleString()}
-              title="Total Companies"
-              action={
-                <CIcon icon={cilBuilding} height={52} className="text-white-50" />
-              }
-            />
-          </CCol>
-        )}
-
-        {hasPermission(PERMISSIONS.PAYROLL_VIEW) && (
-          <CCol sm={6} lg={3}>
-            <CWidgetStatsA
-              className="mb-4"
-              color="success"
-              value={dashboardData.stats.thisMonthPayroll.toLocaleString()}
-              title="This Month Payrolls"
-              action={
-                <CIcon icon={cilCash} height={52} className="text-white-50" />
-              }
-            />
-          </CCol>
-        )}
-
-        {hasPermission(PERMISSIONS.PAYROLL_VIEW) && (
-          <CCol sm={6} lg={3}>
-            <CWidgetStatsA
-              className="mb-4"
-              color="warning"
-              value={dashboardData.stats.pendingPayrolls.toLocaleString()}
-              title="Pending Payrolls"
-              action={
-                <CIcon icon={cilClipboard} height={52} className="text-white-50" />
-              }
-            />
-          </CCol>
-        )}
-      </CRow>
-
-      {/* Payroll Progress */}
-      {hasPermission(PERMISSIONS.PAYROLL_VIEW) && (
-        <CRow className="mb-4">
-          <CCol>
-            <CCard>
-              <CCardHeader>
-                <CIcon icon={cilChart} className="me-2" />
-                Payroll Processing Progress - {formatPayrollPeriod(getCurrentPayrollPeriod())}
-              </CCardHeader>
-              <CCardBody>
-                <div className="d-flex justify-content-between mb-2">
-                  <span>Processed: {dashboardData.monthlyStats.processed}</span>
-                  <span>Pending: {dashboardData.monthlyStats.pending}</span>
-                </div>
-                <CProgress className="mb-3" height={25}>
-                  <CProgress 
-                    color="success" 
-                    value={progressPercentage}
-                  >
-                    {progressPercentage.toFixed(1)}%
-                  </CProgress>
-                </CProgress>
-                <small className="text-medium-emphasis">
-                  {dashboardData.monthlyStats.processed} of {dashboardData.stats.thisMonthPayroll} payrolls processed
-                </small>
-              </CCardBody>
-            </CCard>
-          </CCol>
-        </CRow>
-      )}
-
-      {/* Recent Payrolls */}
-      {hasPermission(PERMISSIONS.PAYROLL_VIEW) && (
-        <CRow>
-          <CCol>
-            <CCard>
-              <CCardHeader>
-                <CIcon icon={cilCalendar} className="me-2" />
-                Recent Payrolls
-              </CCardHeader>
-              <CCardBody>
-                {dashboardData.recentPayrolls.length > 0 ? (
-                  <CTable hover responsive>
-                    <CTableHead>
-                      <CTableRow>
-                        <CTableHeaderCell>Employee</CTableHeaderCell>
-                        <CTableHeaderCell>Period</CTableHeaderCell>
-                        <CTableHeaderCell>Net Pay</CTableHeaderCell>
-                        <CTableHeaderCell>Status</CTableHeaderCell>
-                      </CTableRow>
-                    </CTableHead>
-                    <CTableBody>
-                      {dashboardData.recentPayrolls.map((payroll) => (
-                        <CTableRow key={payroll.payroll_id}>
-                          <CTableDataCell>
-                            {payroll.employee?.name || '-'}
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            {formatPayrollPeriod(payroll.payroll_periode)}
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            {formatCurrency(payroll.net_pay)}
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            <CBadge color={payroll.is_printed ? 'success' : 'warning'}>
-                              {payroll.is_printed ? 'Printed' : 'Pending'}
-                            </CBadge>
-                          </CTableDataCell>
-                        </CTableRow>
-                      ))}
-                    </CTableBody>
-                  </CTable>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-medium-emphasis">No recent payrolls found</p>
+      {!overview ? (
+        <CAlert color="warning">Data dashboard belum tersedia.</CAlert>
+      ) : (
+        <>
+          <CRow className="mb-4">
+            <CCol xs={12}>
+              <CCard>
+                <CCardHeader>
+                  <CIcon icon={cilBuilding} className="me-2" />
+                  Ringkasan Perusahaan
+                </CCardHeader>
+                <CCardBody>
+                  <div className="d-flex flex-wrap gap-4">
+                    <div>
+                      <div className="text-medium-emphasis small">Perusahaan</div>
+                      <strong>{overview.company_name || '-'}</strong>
+                    </div>
+                    <div>
+                      <div className="text-medium-emphasis small">ID Perusahaan</div>
+                      <strong>{overview.company_id ?? '-'}</strong>
+                    </div>
+                    <div>
+                      <div className="text-medium-emphasis small">Rentang Periode</div>
+                      <strong>{periodRangeLabel}</strong>
+                    </div>
                   </div>
-                )}
-              </CCardBody>
-            </CCard>
-          </CCol>
-        </CRow>
+                </CCardBody>
+              </CCard>
+            </CCol>
+          </CRow>
+
+          {canViewEmployees && (
+            <CRow className="mb-4">
+              <CCol sm={6} lg={4}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="primary"
+                  value={toLocaleNumber(employeesMetrics.total)}
+                  title="Total Pegawai"
+                  action={<CIcon icon={cilPeople} height={48} className="text-white-50" />}
+                />
+              </CCol>
+              <CCol sm={6} lg={4}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="success"
+                  value={toLocaleNumber(employeesMetrics.active)}
+                  title="Pegawai Aktif"
+                  action={<CIcon icon={cilCheckCircle} height={48} className="text-white-50" />}
+                />
+              </CCol>
+              <CCol sm={6} lg={4}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="danger"
+                  value={toLocaleNumber(employeesMetrics.inactive)}
+                  title="Pegawai Tidak Aktif"
+                  action={<CIcon icon={cilWarning} height={48} className="text-white-50" />}
+                />
+              </CCol>
+            </CRow>
+          )}
+
+          {canViewPayroll && (
+            <CRow className="mb-4">
+              <CCol sm={6} lg={4}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="info"
+                  value={toLocaleNumber(payrollMetrics.total_records)}
+                  title="Total Data Payroll"
+                  action={<CIcon icon={cilClipboard} height={48} className="text-white-50" />}
+                />
+              </CCol>
+              <CCol sm={6} lg={4}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="success"
+                  value={formatCurrency(payrollMetrics.total_net_pay, { maximumFractionDigits: 0 })}
+                  title="Total Net Pay"
+                  action={<CIcon icon={cilCash} height={48} className="text-white-50" />}
+                />
+              </CCol>
+              <CCol sm={6} lg={4}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="dark"
+                  value={formatPeriodLabel(payrollMetrics.period || payrollMetrics.period_end, '-')}
+                  title="Periode Payroll Terakhir"
+                  action={<CIcon icon={cilCalendar} height={48} className="text-white-50" />}
+                />
+              </CCol>
+            </CRow>
+          )}
+
+          {canViewAttendance && (
+            <CRow className="mb-4">
+              <CCol sm={6} lg={4}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="primary"
+                  value={toLocaleNumber(attendanceMetrics.total_records)}
+                  title="Total Kehadiran"
+                  action={<CIcon icon={cilCalendar} height={48} className="text-white-50" />}
+                />
+              </CCol>
+              <CCol sm={6} lg={4}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="info"
+                  value={toLocaleNumber(attendanceMetrics.covered_employees)}
+                  title="Karyawan Tercakup"
+                  action={<CIcon icon={cilPeople} height={48} className="text-white-50" />}
+                />
+              </CCol>
+              <CCol sm={6} lg={4}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="warning"
+                  value={`${attendanceCoverage}%`}
+                  title="Tingkat Cakupan Kehadiran"
+                  action={<CIcon icon={cilChart} height={48} className="text-white-50" />}
+                />
+              </CCol>
+            </CRow>
+          )}
+
+          {canViewPayroll && (
+            <CRow className="mb-4">
+              <CCol xs={12}>
+                <CCard>
+                  <CCardHeader>
+                    <CIcon icon={cilChart} className="me-2" />
+                    Tren Net Pay (Per Periode)
+                  </CCardHeader>
+                  <CCardBody>
+                    {netPayChartData ? (
+                      <CChartLine data={netPayChartData} options={lineChartOptions} style={{ height: '320px' }} />
+                    ) : (
+                      <div className="text-center py-4 text-medium-emphasis">
+                        Belum ada data net pay terbaru untuk rentang periode ini.
+                      </div>
+                    )}
+                  </CCardBody>
+                </CCard>
+              </CCol>
+            </CRow>
+          )}
+
+          {canViewAttendance && (
+            <CRow>
+              <CCol xs={12}>
+                <CCard>
+                  <CCardHeader>
+                    <CIcon icon={cilCalendar} className="me-2" />
+                    Tren Kehadiran Per Periode
+                  </CCardHeader>
+                  <CCardBody>
+                    {attendanceChartData ? (
+                      <CChartBar data={attendanceChartData} options={barChartOptions} style={{ height: '320px' }} />
+                    ) : (
+                      <div className="text-center py-4 text-medium-emphasis">
+                        Belum ada data kehadiran untuk rentang periode ini.
+                      </div>
+                    )}
+                  </CCardBody>
+                </CCard>
+              </CCol>
+            </CRow>
+          )}
+        </>
       )}
     </>
   );

@@ -199,8 +199,6 @@ class EmployeeService {
 
     if (!data.nik?.trim()) {
       errors.nik = 'NIK is required';
-    } else if (!/^[A-Z0-9]{3,10}$/.test(data.nik)) {
-      errors.nik = 'NIK must be 3-10 characters (letters and numbers only)';
     }
 
     if (!data.name?.trim()) {

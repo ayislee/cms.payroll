@@ -700,10 +700,24 @@ const EmployeeDetail = () => {
                       <CCol xs={12}>
                         <CCard className="mb-4">
                           <CCardHeader>
-                            <h5 className="mb-0">
-                              <CIcon icon={cilSettings} className="me-2" />
-                              Employee Payroll Components
-                            </h5>
+                            <CRow className="align-items-center">
+                              <CCol>
+                                <h5 className="mb-0">
+                                  <CIcon icon={cilSettings} className="me-2" />
+                                  Employee Payroll Components
+                                </h5>
+                              </CCol>
+                              {hasPermission(PERMISSIONS.EMPLOYEES_UPDATE) && (
+                                <CCol xs="auto">
+                                  <Link to={`/employees/${id}/edit`}>
+                                    <CButton color="warning" size="sm">
+                                      <CIcon icon={cilPencil} className="me-1" />
+                                      Edit Employee
+                                    </CButton>
+                                  </Link>
+                                </CCol>
+                              )}
+                            </CRow>
                           </CCardHeader>
                           <CCardBody>
                             {componentsLoading ? (

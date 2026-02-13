@@ -222,9 +222,6 @@ class EmployeeService {
     }
 
     // Optional fields validation
-    if (data.phone && !/^(\+62|62|0)8[1-9][0-9]{6,9}$/.test(data.phone)) {
-      errors.phone = 'Invalid phone number format';
-    }
 
     if (data.rekening && data.rekening.length < 6) {
       errors.rekening = 'Account number should be at least 6 characters';

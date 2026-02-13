@@ -150,8 +150,9 @@ class ComponentService {
       errors.attendance_based = 'Attendance based must be 0 or 1';
     }
 
-    if (data.attendance_based === '1' && !['full', 'prorate'].includes(data.attendance_type)) {
-      errors.attendance_type = 'Attendance type must be either full or prorate';
+    const allowedAttendanceTypes = ['full', 'prorate', 'daily'];
+    if (data.attendance_based === '1' && !allowedAttendanceTypes.includes(data.attendance_type)) {
+      errors.attendance_type = 'Attendance type must be full, prorate, or daily';
     }
 
     // Conditional validation

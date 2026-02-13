@@ -412,8 +412,9 @@ const ComponentForm = () => {
                           value={formData.attendance_type}
                           onChange={handleInputChange}
                         >
-                        <option value="full">Full Attendance</option>
-                        <option value="prorate">Prorate</option>
+                          <option value="full">Full Attendance</option>
+                          <option value="prorate">Prorate</option>
+                          <option value="daily">Daily</option>
                         </CFormSelect>
                       </div>
                     </CCol>

@@ -16,6 +16,7 @@ class EmployeeService {
       if (params.rows) queryParams.append('rows', params.rows);
       if (params.search) queryParams.append('search', params.search);
       if (params.company_id) queryParams.append('company_id', params.company_id);
+      if (params.ptkp) queryParams.append('ptkp', params.ptkp);
       
       const url = `${API_ENDPOINTS.EMPLOYEES.LIST}?${queryParams.toString()}`;
       const response = await apiClient.get(url);

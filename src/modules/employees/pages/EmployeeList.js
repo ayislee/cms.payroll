@@ -333,6 +333,10 @@ const EmployeeList = () => {
   const [companyOptionsLoading, setCompanyOptionsLoading] = useState(false);
   const [companyFilterError, setCompanyFilterError] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
+  const [ptkpOptions, setPtkpOptions] = useState([]);
+  const [ptkpOptionsLoading, setPtkpOptionsLoading] = useState(false);
+  const [ptkpFilterError, setPtkpFilterError] = useState('');
+  const [selectedPtkp, setSelectedPtkp] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
@@ -375,6 +379,10 @@ const EmployeeList = () => {
 
     return selectedOption?.label || `Company #${selectedCompanyId}`;
   }, [companyOptions, selectedCompanyId]);
+
+  const selectedPtkpLabel = useMemo(() => {
+    return selectedPtkp ? resolvePTKPLabel(selectedPtkp) : '';
+  }, [resolvePTKPLabel, selectedPtkp]);
 
   const uniqueCompanyCount = useMemo(() => {
     if (!employees.length) return 0;
@@ -435,6 +443,10 @@ const EmployeeList = () => {
       filterParts.push(`in ${selectedCompanyLabel}`);
     }
 
+    if (selectedPtkpLabel) {
+      filterParts.push(`with PTKP ${selectedPtkpLabel}`);
+    }
+
     if (totalEmployees > 0) {
       const start = ((currentPage - 1) * rows) + 1;
       const end = Math.min(currentPage * rows, totalEmployees);
@@ -452,7 +464,7 @@ const EmployeeList = () => {
     }
 
     return 'No employees available yet';
-  }, [currentPage, rows, selectedCompanyLabel, totalEmployees, trimmedSearchTerm]);
+  }, [currentPage, rows, selectedCompanyLabel, selectedPtkpLabel, totalEmployees, trimmedSearchTerm]);
 
   // Load employees data
   const loadEmployees = useCallback(async (
@@ -460,14 +472,16 @@ const EmployeeList = () => {
     search = '',
     showSearchIndicator = true,
     rowsOverride,
-    companyId = ''
+    companyId = '',
+    ptkp = ''
   ) => {
     try {
       const effectiveCompanyId = String(companyId || '').trim();
+      const effectivePtkp = String(ptkp || '').trim();
 
       if (showSearchIndicator) {
         setLoading(true);
-        setIsSearching(search.trim() !== '' || effectiveCompanyId !== '');
+        setIsSearching(search.trim() !== '' || effectiveCompanyId !== '' || effectivePtkp !== '');
       }
       setError('');
 
@@ -483,6 +497,10 @@ const EmployeeList = () => {
 
       if (effectiveCompanyId) {
         params.company_id = effectiveCompanyId;
+      }
+
+      if (effectivePtkp) {
+        params.ptkp = effectivePtkp;
       }
 
       const response = await employeeService.getEmployees(params);
@@ -506,7 +524,7 @@ const EmployeeList = () => {
 
   // Initial load
   useEffect(() => {
-    loadEmployees(1, '', true, config.pagination.defaultRows, '');
+    loadEmployees(1, '', true, config.pagination.defaultRows, '', '');
   }, [loadEmployees]);
 
   useEffect(() => {
@@ -542,6 +560,47 @@ const EmployeeList = () => {
       isMounted = false;
     };
   }, []);
+
+  const loadPtkpOptions = useCallback(async () => {
+    try {
+      setPtkpOptionsLoading(true);
+      setPtkpFilterError('');
+
+      const employeeOptions = await employeeService.getAllEmployees();
+      const usedPtkpValues = new Set(
+        (Array.isArray(employeeOptions) ? employeeOptions : [])
+          .map((employee) => String(employee.ptkp || '').trim())
+          .filter(Boolean)
+      );
+      const ptkpOrder = PTKP_OPTIONS.reduce((map, option, index) => {
+        map[option.value] = index;
+        return map;
+      }, {});
+
+      const sortedOptions = Array.from(usedPtkpValues).sort((a, b) => {
+        const orderA = ptkpOrder[a] ?? Number.MAX_SAFE_INTEGER;
+        const orderB = ptkpOrder[b] ?? Number.MAX_SAFE_INTEGER;
+
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+
+        return resolvePTKPLabel(a).localeCompare(resolvePTKPLabel(b));
+      });
+
+      setPtkpOptions(sortedOptions);
+    } catch (error) {
+      console.error('Error loading PTKP filter options:', error);
+      setPtkpOptions([]);
+      setPtkpFilterError('PTKP filter unavailable');
+    } finally {
+      setPtkpOptionsLoading(false);
+    }
+  }, [resolvePTKPLabel]);
+
+  useEffect(() => {
+    loadPtkpOptions();
+  }, [loadPtkpOptions]);
 
   const generateSuggestions = useCallback((searchValue) => {
     const trimmed = searchValue.trim();
@@ -624,8 +683,8 @@ const EmployeeList = () => {
       });
     }
 
-    loadEmployees(1, trimmed, true, rows, selectedCompanyId);
-  }, [loadEmployees, rows, selectedCompanyId, trimmedSearchInput]);
+    loadEmployees(1, trimmed, true, rows, selectedCompanyId, selectedPtkp);
+  }, [loadEmployees, rows, selectedCompanyId, selectedPtkp, trimmedSearchInput]);
 
   const handleSearchFromHistory = useCallback(
     (value) => {
@@ -646,21 +705,22 @@ const EmployeeList = () => {
         return [trimmed, ...filtered].slice(0, 10);
       });
 
-      loadEmployees(1, trimmed, true, rows, selectedCompanyId);
+      loadEmployees(1, trimmed, true, rows, selectedCompanyId, selectedPtkp);
     },
-    [loadEmployees, rows, selectedCompanyId]
+    [loadEmployees, rows, selectedCompanyId, selectedPtkp]
   );
 
   const handleResetSearch = useCallback(() => {
     setSearchInput('');
     setSearchTerm('');
     setSelectedCompanyId('');
+    setSelectedPtkp('');
     setCurrentPage(1);
     setShowSuggestions(false);
     setSearchSuggestions([]);
     setShowSearchHistory(false);
 
-    loadEmployees(1, '', true, rows, '');
+    loadEmployees(1, '', true, rows, '', '');
   }, [loadEmployees, rows]);
 
   const clearSearchHistory = useCallback(() => {
@@ -677,9 +737,9 @@ const EmployeeList = () => {
       setCurrentPage(1);
       setShowSuggestions(false);
 
-      loadEmployees(1, trimmed, true, rows, selectedCompanyId);
+      loadEmployees(1, trimmed, true, rows, selectedCompanyId, selectedPtkp);
     },
-    [loadEmployees, rows, selectedCompanyId]
+    [loadEmployees, rows, selectedCompanyId, selectedPtkp]
   );
 
   const handleCompanyFilterChange = useCallback(
@@ -691,17 +751,31 @@ const EmployeeList = () => {
       setShowSuggestions(false);
       setShowSearchHistory(false);
 
-      loadEmployees(1, searchTerm, true, rows, companyId);
+      loadEmployees(1, searchTerm, true, rows, companyId, selectedPtkp);
     },
-    [loadEmployees, rows, searchTerm]
+    [loadEmployees, rows, searchTerm, selectedPtkp]
+  );
+
+  const handlePtkpFilterChange = useCallback(
+    (event) => {
+      const ptkp = event.target.value;
+
+      setSelectedPtkp(ptkp);
+      setCurrentPage(1);
+      setShowSuggestions(false);
+      setShowSearchHistory(false);
+
+      loadEmployees(1, searchTerm, true, rows, selectedCompanyId, ptkp);
+    },
+    [loadEmployees, rows, searchTerm, selectedCompanyId]
   );
 
   const handlePageChange = useCallback(
     (page) => {
       setCurrentPage(page);
-      loadEmployees(page, searchTerm, true, rows, selectedCompanyId);
+      loadEmployees(page, searchTerm, true, rows, selectedCompanyId, selectedPtkp);
     },
-    [loadEmployees, rows, searchTerm, selectedCompanyId]
+    [loadEmployees, rows, searchTerm, selectedCompanyId, selectedPtkp]
   );
 
   const handleRowsChange = useCallback(
@@ -715,14 +789,15 @@ const EmployeeList = () => {
         clearTimeout(searchDebounceRef.current);
       }
 
-      loadEmployees(1, searchTerm, true, newRows, selectedCompanyId);
+      loadEmployees(1, searchTerm, true, newRows, selectedCompanyId, selectedPtkp);
     },
-    [loadEmployees, searchTerm, selectedCompanyId]
+    [loadEmployees, searchTerm, selectedCompanyId, selectedPtkp]
   );
 
   const handleRefresh = useCallback(() => {
-    loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
-  }, [currentPage, loadEmployees, rows, searchTerm, selectedCompanyId]);
+    loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId, selectedPtkp);
+    loadPtkpOptions();
+  }, [currentPage, loadEmployees, loadPtkpOptions, rows, searchTerm, selectedCompanyId, selectedPtkp]);
 
   const handleDelete = useCallback((employee) => {
     setEmployeeToDelete(employee);
@@ -737,14 +812,15 @@ const EmployeeList = () => {
       await employeeService.deleteEmployee(employeeToDelete.employee_id);
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
-      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
+      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId, selectedPtkp);
+      loadPtkpOptions();
     } catch (error) {
       console.error('Error deleting employee:', error);
       setError(error.message || 'Failed to delete employee');
     } finally {
       setDeleting(false);
     }
-  }, [currentPage, employeeToDelete, loadEmployees, rows, searchTerm, selectedCompanyId]);
+  }, [currentPage, employeeToDelete, loadEmployees, loadPtkpOptions, rows, searchTerm, selectedCompanyId, selectedPtkp]);
 
   const handleOpenSyncModal = useCallback(() => {
     setShowSyncModal(true);
@@ -767,7 +843,8 @@ const EmployeeList = () => {
       setInfoMessage(
         'Sinkronisasi karyawan sedang diproses. Data akan diperbarui setelah backend menyelesaikan proses.'
       );
-      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
+      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId, selectedPtkp);
+      loadPtkpOptions();
     } catch (syncError) {
       console.error('Error syncing employees:', syncError);
       setShowSyncModal(false);
@@ -776,7 +853,7 @@ const EmployeeList = () => {
     } finally {
       setSyncing(false);
     }
-  }, [currentPage, loadEmployees, rows, searchTerm, selectedCompanyId]);
+  }, [currentPage, loadEmployees, loadPtkpOptions, rows, searchTerm, selectedCompanyId, selectedPtkp]);
 
   const handleCreateEmployee = useCallback(() => {
     navigate('/employees/create');
@@ -1025,7 +1102,7 @@ const EmployeeList = () => {
                       color="light"
                       className="text-danger"
                       onClick={handleResetSearch}
-                      disabled={!trimmedSearchTerm && !trimmedSearchInput && !selectedCompanyId}
+                      disabled={!trimmedSearchTerm && !trimmedSearchInput && !selectedCompanyId && !selectedPtkp}
                     >
                       <CIcon icon={cilTrash} className="me-2" />
                       Reset
@@ -1093,6 +1170,32 @@ const EmployeeList = () => {
                     </CFormSelect>
                     {companyFilterError && (
                       <small className="text-warning d-block mt-1">{companyFilterError}</small>
+                    )}
+                  </div>
+                  <div style={{ minWidth: '160px' }}>
+                    <div className="stat-card__label mb-1">PTKP</div>
+                    <CFormSelect
+                      size="sm"
+                      value={selectedPtkp}
+                      onChange={handlePtkpFilterChange}
+                      disabled={ptkpOptionsLoading}
+                    >
+                      <option value="">All PTKP</option>
+                      {ptkpOptionsLoading && (
+                        <option disabled>Loading PTKP...</option>
+                      )}
+                      {!ptkpOptionsLoading && ptkpOptions.length === 0 && (
+                        <option disabled>No PTKP filled</option>
+                      )}
+                      {!ptkpOptionsLoading &&
+                        ptkpOptions.map((ptkp) => (
+                          <option key={ptkp} value={ptkp}>
+                            {resolvePTKPLabel(ptkp)}
+                          </option>
+                        ))}
+                    </CFormSelect>
+                    {ptkpFilterError && (
+                      <small className="text-warning d-block mt-1">{ptkpFilterError}</small>
                     )}
                   </div>
                   <div>
@@ -1266,20 +1369,20 @@ const EmployeeList = () => {
                   <CTableDataCell colSpan={7} className="text-center py-5">
                     <div className="py-4">
                       <CIcon
-                        icon={trimmedSearchTerm || selectedCompanyId ? cilMagnifyingGlass : cilPeople}
+                        icon={trimmedSearchTerm || selectedCompanyId || selectedPtkp ? cilMagnifyingGlass : cilPeople}
                         className="text-primary mb-3"
                         size="xl"
                       />
                       <h5 className="fw-semibold mb-2">
-                        {trimmedSearchTerm || selectedCompanyId ? 'No matching employees' : 'No employees on record yet'}
+                        {trimmedSearchTerm || selectedCompanyId || selectedPtkp ? 'No matching employees' : 'No employees on record yet'}
                       </h5>
                       <p className="text-medium-emphasis mb-4">
-                        {trimmedSearchTerm || selectedCompanyId
+                        {trimmedSearchTerm || selectedCompanyId || selectedPtkp
                           ? 'Adjust your filters or clear them to see the full directory.'
                           : 'Start building your organisation by adding your first employee profile.'}
                       </p>
                       <div className="d-flex justify-content-center gap-3 flex-wrap">
-                        {(trimmedSearchTerm || selectedCompanyId) && (
+                        {(trimmedSearchTerm || selectedCompanyId || selectedPtkp) && (
                           <CButton color="link" className="text-decoration-none" onClick={handleResetSearch}>
                             Clear filters
                           </CButton>

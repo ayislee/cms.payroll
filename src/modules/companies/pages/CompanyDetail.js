@@ -40,6 +40,7 @@ import { useDocumentTitle } from '../../../utils/documentTitle';
 import { formatDateTime, formatPhoneNumber } from '../../../utils/formatters';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import companyService from '../services/companyService';
+import CompanyBenefitsPanel from '../components/CompanyBenefitsPanel';
 
 const detailStyles = `
   .company-detail-hero {
@@ -641,6 +642,13 @@ const CompanyDetail = () => {
           </CCard>
         </CCol>
       </CRow>
+
+      <CompanyBenefitsPanel
+        companyId={company.company_id}
+        canManage={hasPermission(PERMISSIONS.COMPANIES_UPDATE)}
+        canDelete={hasPermission(PERMISSIONS.COMPANIES_DELETE)}
+        className="mt-4"
+      />
     </>
   );
 };

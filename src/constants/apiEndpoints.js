@@ -58,6 +58,15 @@ export const API_ENDPOINTS = {
     SYNC_EXTERNAL: `${API_BASE}/company/sync-external`
   },
 
+  // Company Benefit Endpoints
+  COMPANY_BENEFITS: {
+    LIST: `${API_BASE}/company-benefits`,
+    DETAIL: (id) => `${API_BASE}/company-benefits/${id}`,
+    CREATE: `${API_BASE}/company-benefits`,
+    UPDATE: (id) => `${API_BASE}/company-benefits/${id}`,
+    DELETE: (id) => `${API_BASE}/company-benefits/${id}`
+  },
+
   // Main Component Endpoints
   MAIN_COMPONENTS: {
     LIST: `${API_BASE}/maincomponent`,

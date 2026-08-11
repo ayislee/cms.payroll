@@ -207,6 +207,109 @@ class CompanyService {
     }
   }
 
+  async getCompanyBenefits(companyId, params = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('company_id', companyId);
+      queryParams.append('page', params.page || 1);
+      queryParams.append('rows', params.rows || 100);
+
+      if (params.search) queryParams.append('search', params.search);
+      if (params.benefit_type) queryParams.append('benefit_type', params.benefit_type);
+      if (params.is_active !== undefined && params.is_active !== '') {
+        queryParams.append('is_active', params.is_active);
+      }
+
+      const response = await apiClient.get(`${API_ENDPOINTS.COMPANY_BENEFITS.LIST}?${queryParams.toString()}`);
+      const raw = response || {};
+      const pagination = raw.data || {};
+      const benefits = Array.isArray(pagination.data)
+        ? pagination.data
+        : Array.isArray(pagination)
+        ? pagination
+        : [];
+
+      return {
+        status: raw.status ?? true,
+        message: raw.message ?? '',
+        data: benefits.map((benefit) => this.formatCompanyBenefit(benefit)),
+        total: Number(pagination.total ?? benefits.length) || 0,
+        perPage: Number(pagination.perPage ?? pagination.per_page ?? params.rows ?? 100) || 100,
+        page: Number(pagination.page ?? pagination.current_page ?? params.page ?? 1) || 1,
+        lastPage: Number(pagination.lastPage ?? pagination.last_page ?? 1) || 1
+      };
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async createCompanyBenefit(benefitData) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.COMPANY_BENEFITS.CREATE, benefitData);
+      const benefit = response?.data || response;
+      return this.formatCompanyBenefit(benefit);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async updateCompanyBenefit(id, benefitData) {
+    try {
+      const response = await apiClient.put(API_ENDPOINTS.COMPANY_BENEFITS.UPDATE(id), benefitData);
+      const benefit = response?.data || response;
+      return this.formatCompanyBenefit(benefit);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async deleteCompanyBenefit(id) {
+    try {
+      const response = await apiClient.delete(API_ENDPOINTS.COMPANY_BENEFITS.DELETE(id));
+      return response.data || response;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  validateCompanyBenefitData(data) {
+    const errors = {};
+    const employeePercentage = Number(data.employee_percentage || 0);
+    const employerPercentage = Number(data.employer_percentage || 0);
+    const maxBase = data.max_base === '' || data.max_base === null || data.max_base === undefined
+      ? null
+      : Number(data.max_base);
+
+    if (!data.name?.trim()) {
+      errors.name = 'Benefit name is required';
+    }
+
+    if (!Number.isFinite(employeePercentage) || employeePercentage < 0 || employeePercentage > 100) {
+      errors.employee_percentage = 'Employee percentage must be between 0 and 100';
+    }
+
+    if (!Number.isFinite(employerPercentage) || employerPercentage < 0 || employerPercentage > 100) {
+      errors.employer_percentage = 'Employer percentage must be between 0 and 100';
+    }
+
+    if (Number.isFinite(employeePercentage) && Number.isFinite(employerPercentage) && employeePercentage + employerPercentage > 100) {
+      errors.employer_percentage = 'Total percentage cannot exceed 100';
+    }
+
+    if (maxBase !== null && (!Number.isFinite(maxBase) || maxBase < 0)) {
+      errors.max_base = 'Max base must be a non-negative number';
+    }
+
+    if (data.effective_date && data.expired_date && data.expired_date < data.effective_date) {
+      errors.expired_date = 'Expired date must be after effective date';
+    }
+
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors
+    };
+  }
+
   // Validate company data
   validateCompanyData(data) {
     const errors = {};
@@ -324,6 +427,41 @@ class CompanyService {
       created_at: company.created_at ?? company.createdAt ?? null,
       updated_at: company.updated_at ?? company.updatedAt ?? null,
       stats: company.stats ?? company.metrics ?? {}
+    };
+  }
+
+  formatCompanyBenefit(benefit) {
+    const mainComponent = benefit?.mainComponent || benefit?.main_component || benefit?.main_component_data || null;
+    const employeePercentage = Number(benefit?.employee_percentage ?? 0);
+    const employerPercentage = Number(benefit?.employer_percentage ?? 0);
+    const totalPercentage = Number(benefit?.total_percentage ?? employeePercentage + employerPercentage);
+    const rawIsActive = benefit?.is_active;
+    const isActive = rawIsActive === undefined || rawIsActive === null
+      ? true
+      : rawIsActive === true || rawIsActive === 1 || rawIsActive === '1' || rawIsActive === 'true';
+    const rawIsTaxable = benefit?.is_taxable;
+    const isTaxable = rawIsTaxable === undefined || rawIsTaxable === null
+      ? false
+      : rawIsTaxable === true || rawIsTaxable === 1 || rawIsTaxable === '1' || rawIsTaxable === 'true';
+
+    return {
+      company_benefit_id: benefit?.company_benefit_id ?? benefit?.id ?? null,
+      company_id: benefit?.company_id ?? null,
+      name: benefit?.name ?? 'Benefit',
+      benefit_type: benefit?.benefit_type ?? '',
+      description: benefit?.description ?? '',
+      employee_percentage: Number.isFinite(employeePercentage) ? employeePercentage : 0,
+      employer_percentage: Number.isFinite(employerPercentage) ? employerPercentage : 0,
+      total_percentage: Number.isFinite(totalPercentage) ? totalPercentage : 0,
+      main_component_id: benefit?.main_component_id ?? null,
+      main_component: mainComponent,
+      max_base: benefit?.max_base ?? null,
+      is_active: isActive,
+      is_taxable: isTaxable,
+      effective_date: benefit?.effective_date ?? '',
+      expired_date: benefit?.expired_date ?? '',
+      created_at: benefit?.created_at ?? null,
+      updated_at: benefit?.updated_at ?? null
     };
   }
 

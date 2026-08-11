@@ -120,18 +120,23 @@ export const formatTime = (time) => {
 
 // Format payroll period (YYYYMM to readable format)
 export const formatPayrollPeriod = (period) => {
-  if (!period || period.length !== 6) return '-';
+  const normalized = String(period || '').trim();
+
+  if (!/^\d{6}$/.test(normalized)) return '-';
   
-  const year = period.substring(0, 4);
-  const month = period.substring(4, 6);
-  const monthIndex = parseInt(month) - 1;
+  const year = normalized.substring(0, 4);
+  const month = normalized.substring(4, 6);
+  const monthIndex = parseInt(month, 10) - 1;
   
   const monthNames = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
   ];
+
+  const monthName = monthNames[monthIndex];
+  if (!monthName) return normalized;
   
-  return `${monthNames[monthIndex]} ${year}`;
+  return `${monthName} ${year}`;
 };
 
 // Format file size

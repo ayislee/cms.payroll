@@ -356,8 +356,10 @@ const AttendanceList = () => {
     const normalized = String(period || '').trim();
 
     if (/^\d{6}$/.test(normalized)) {
+      const formattedPeriod = formatPayrollPeriod(normalized);
+
       return {
-        formatted: formatPayrollPeriod(normalized),
+        formatted: formattedPeriod && formattedPeriod !== '-' ? formattedPeriod : normalized,
         raw: normalized
       };
     }
@@ -453,8 +455,9 @@ const AttendanceList = () => {
     setDeletingAttendanceId(null);
   };
 
-  const syncConfirmPeriodInfo = pendingSyncPeriod
-    ? resolvePeriodLabel(pendingSyncPeriod)
+  const syncConfirmPeriod = (pendingSyncPeriod || syncPeriod || '').trim();
+  const syncConfirmPeriodInfo = syncConfirmPeriod
+    ? resolvePeriodLabel(syncConfirmPeriod)
     : null;
 
   const handleOpenEditModal = (attendance) => {
@@ -1198,7 +1201,7 @@ const AttendanceList = () => {
             <CModalBody>
               <p className="mb-3">
                 Synchronize attendance data for period{' '}
-                <strong>{syncConfirmPeriodInfo?.formatted || pendingSyncPeriod || '-'}</strong>?
+                <strong>{syncConfirmPeriodInfo?.formatted || syncConfirmPeriod || '-'}</strong>?
               </p>
               <p className="text-medium-emphasis mb-0">
                 This action will trigger an external sync request and may take a few moments to complete.

@@ -60,6 +60,7 @@ const ComponentList = () => {
   const [components, setComponents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -75,6 +76,7 @@ const ComponentList = () => {
       setComponents(response.data || []);
       setError('');
     } catch (error) {
+      setSuccess('');
       setError(error.message || 'Failed to load components');
     } finally {
       setLoading(false);
@@ -91,11 +93,14 @@ const ComponentList = () => {
 
     try {
       setDeleting(true);
-      await componentService.deleteComponent(componentToDelete.main_component_id);
+      const response = await componentService.deleteComponent(componentToDelete.main_component_id);
       setShowDeleteModal(false);
       setComponentToDelete(null);
+      setError('');
+      setSuccess(response.message || 'Component deleted successfully');
       await loadComponents(); // Reload data
     } catch (error) {
+      setSuccess('');
       setError(error.message || 'Failed to delete component');
     } finally {
       setDeleting(false);
@@ -213,6 +218,12 @@ const ComponentList = () => {
               {error && (
                 <CAlert color="danger" className="mb-4">
                   {error}
+                </CAlert>
+              )}
+
+              {success && (
+                <CAlert color="success" className="mb-4">
+                  {success}
                 </CAlert>
               )}
 

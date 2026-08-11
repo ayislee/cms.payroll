@@ -64,7 +64,7 @@ export const API_ENDPOINTS = {
     DETAIL: (id) => `${API_BASE}/maincomponent/show?main_component_id=${id}`,
     CREATE: `${API_BASE}/maincomponent/store`,
     UPDATE: `${API_BASE}/maincomponent/update`,
-    DELETE: (id) => `${API_BASE}/maincomponent/${id}`
+    DELETE: (id) => `${API_BASE}/maincomponent/delete?main_component_id=${id}`
   },
 
   // Payroll Management Endpoints

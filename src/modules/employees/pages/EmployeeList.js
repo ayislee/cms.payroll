@@ -2,7 +2,7 @@
 // EMPLOYEE LIST PAGE
 // ========================================
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   CRow,
@@ -58,6 +58,7 @@ import { formatDate, formatDateTime, formatPhoneNumber, formatStatus } from '../
 import { PERMISSIONS } from '../../../constants/userRoles';
 import { PTKP_OPTIONS } from '../../../constants/payrollConstants';
 import employeeService from '../services/employeeService';
+import companyService from '../../companies/services/companyService';
 import config from '../../../config/environment';
 
 // Enhanced Search Styles
@@ -328,6 +329,10 @@ const EmployeeList = () => {
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [companyOptions, setCompanyOptions] = useState([]);
+  const [companyOptionsLoading, setCompanyOptionsLoading] = useState(false);
+  const [companyFilterError, setCompanyFilterError] = useState('');
+  const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
@@ -341,6 +346,7 @@ const EmployeeList = () => {
   const canCreateEmployee = hasPermission(PERMISSIONS.EMPLOYEES_CREATE);
   const canUpdateEmployee = hasPermission(PERMISSIONS.EMPLOYEES_UPDATE);
   const canSyncEmployees = canCreateEmployee || canUpdateEmployee;
+  const searchDebounceRef = useRef(null);
 
   const ptkpLabelMap = useMemo(() => {
     return PTKP_OPTIONS.reduce((map, option) => {
@@ -359,6 +365,16 @@ const EmployeeList = () => {
 
   const trimmedSearchTerm = searchTerm.trim();
   const trimmedSearchInput = searchInput.trim();
+
+  const selectedCompanyLabel = useMemo(() => {
+    if (!selectedCompanyId) return '';
+
+    const selectedOption = companyOptions.find(
+      (option) => String(option.value) === String(selectedCompanyId)
+    );
+
+    return selectedOption?.label || `Company #${selectedCompanyId}`;
+  }, [companyOptions, selectedCompanyId]);
 
   const uniqueCompanyCount = useMemo(() => {
     if (!employees.length) return 0;
@@ -409,41 +425,65 @@ const EmployeeList = () => {
   }, [employees]);
 
   const summaryText = useMemo(() => {
+    const filterParts = [];
+
+    if (trimmedSearchTerm) {
+      filterParts.push(`matching "${trimmedSearchTerm}"`);
+    }
+
+    if (selectedCompanyLabel) {
+      filterParts.push(`in ${selectedCompanyLabel}`);
+    }
+
     if (totalEmployees > 0) {
       const start = ((currentPage - 1) * rows) + 1;
       const end = Math.min(currentPage * rows, totalEmployees);
       let base = `Showing ${start}-${end} of ${totalEmployees} employees`;
 
-      if (trimmedSearchTerm) {
-        base += ` matching "${trimmedSearchTerm}"`;
+      if (filterParts.length > 0) {
+        base += ` ${filterParts.join(' ')}`;
       }
 
       return base;
     }
 
-    if (trimmedSearchTerm) {
-      return `No employees found for "${trimmedSearchTerm}"`;
+    if (filterParts.length > 0) {
+      return `No employees found ${filterParts.join(' ')}`;
     }
 
     return 'No employees available yet';
-  }, [currentPage, rows, totalEmployees, trimmedSearchTerm]);
+  }, [currentPage, rows, selectedCompanyLabel, totalEmployees, trimmedSearchTerm]);
 
   // Load employees data
-  const loadEmployees = useCallback(async (page = 1, search = '', showSearchIndicator = true, rowsOverride) => {
+  const loadEmployees = useCallback(async (
+    page = 1,
+    search = '',
+    showSearchIndicator = true,
+    rowsOverride,
+    companyId = ''
+  ) => {
     try {
+      const effectiveCompanyId = String(companyId || '').trim();
+
       if (showSearchIndicator) {
         setLoading(true);
-        setIsSearching(search.trim() !== '');
+        setIsSearching(search.trim() !== '' || effectiveCompanyId !== '');
       }
       setError('');
 
-      const effectiveRows = rowsOverride && Number.isFinite(rowsOverride) ? rowsOverride : rows;
+      const effectiveRows = rowsOverride && Number.isFinite(rowsOverride)
+        ? rowsOverride
+        : config.pagination.defaultRows;
 
       const params = {
         page,
         rows: effectiveRows,
         search: search.trim()
       };
+
+      if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
 
       const response = await employeeService.getEmployees(params);
 
@@ -462,12 +502,46 @@ const EmployeeList = () => {
       setLoading(false);
       setIsSearching(false);
     }
-  }, [rows]);
+  }, []);
 
   // Initial load
   useEffect(() => {
-    loadEmployees(1, '');
+    loadEmployees(1, '', true, config.pagination.defaultRows, '');
   }, [loadEmployees]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCompanyOptions = async () => {
+      try {
+        setCompanyOptionsLoading(true);
+        setCompanyFilterError('');
+
+        const options = await companyService.getCompanyOptions();
+
+        if (isMounted) {
+          setCompanyOptions(Array.isArray(options) ? options : []);
+        }
+      } catch (error) {
+        console.error('Error loading company filter options:', error);
+
+        if (isMounted) {
+          setCompanyOptions([]);
+          setCompanyFilterError('Company filter unavailable');
+        }
+      } finally {
+        if (isMounted) {
+          setCompanyOptionsLoading(false);
+        }
+      }
+    };
+
+    loadCompanyOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const generateSuggestions = useCallback((searchValue) => {
     const trimmed = searchValue.trim();
@@ -550,8 +624,8 @@ const EmployeeList = () => {
       });
     }
 
-    loadEmployees(1, trimmed);
-  }, [loadEmployees, trimmedSearchInput]);
+    loadEmployees(1, trimmed, true, rows, selectedCompanyId);
+  }, [loadEmployees, rows, selectedCompanyId, trimmedSearchInput]);
 
   const handleSearchFromHistory = useCallback(
     (value) => {
@@ -572,21 +646,22 @@ const EmployeeList = () => {
         return [trimmed, ...filtered].slice(0, 10);
       });
 
-      loadEmployees(1, trimmed);
+      loadEmployees(1, trimmed, true, rows, selectedCompanyId);
     },
-    [loadEmployees]
+    [loadEmployees, rows, selectedCompanyId]
   );
 
   const handleResetSearch = useCallback(() => {
     setSearchInput('');
     setSearchTerm('');
+    setSelectedCompanyId('');
     setCurrentPage(1);
     setShowSuggestions(false);
     setSearchSuggestions([]);
     setShowSearchHistory(false);
 
-    loadEmployees(1, '');
-  }, [loadEmployees]);
+    loadEmployees(1, '', true, rows, '');
+  }, [loadEmployees, rows]);
 
   const clearSearchHistory = useCallback(() => {
     setSearchHistory([]);
@@ -602,17 +677,31 @@ const EmployeeList = () => {
       setCurrentPage(1);
       setShowSuggestions(false);
 
-      loadEmployees(1, trimmed);
+      loadEmployees(1, trimmed, true, rows, selectedCompanyId);
     },
-    [loadEmployees]
+    [loadEmployees, rows, selectedCompanyId]
+  );
+
+  const handleCompanyFilterChange = useCallback(
+    (event) => {
+      const companyId = event.target.value;
+
+      setSelectedCompanyId(companyId);
+      setCurrentPage(1);
+      setShowSuggestions(false);
+      setShowSearchHistory(false);
+
+      loadEmployees(1, searchTerm, true, rows, companyId);
+    },
+    [loadEmployees, rows, searchTerm]
   );
 
   const handlePageChange = useCallback(
     (page) => {
       setCurrentPage(page);
-      loadEmployees(page, searchTerm);
+      loadEmployees(page, searchTerm, true, rows, selectedCompanyId);
     },
-    [loadEmployees, searchTerm]
+    [loadEmployees, rows, searchTerm, selectedCompanyId]
   );
 
   const handleRowsChange = useCallback(
@@ -626,14 +715,14 @@ const EmployeeList = () => {
         clearTimeout(searchDebounceRef.current);
       }
 
-      loadEmployees(1, searchTerm, true, newRows);
+      loadEmployees(1, searchTerm, true, newRows, selectedCompanyId);
     },
-    [loadEmployees, searchTerm]
+    [loadEmployees, searchTerm, selectedCompanyId]
   );
 
   const handleRefresh = useCallback(() => {
-    loadEmployees(currentPage, searchTerm);
-  }, [currentPage, loadEmployees, searchTerm]);
+    loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
+  }, [currentPage, loadEmployees, rows, searchTerm, selectedCompanyId]);
 
   const handleDelete = useCallback((employee) => {
     setEmployeeToDelete(employee);
@@ -648,14 +737,14 @@ const EmployeeList = () => {
       await employeeService.deleteEmployee(employeeToDelete.employee_id);
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
-      loadEmployees(currentPage, searchTerm);
+      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
     } catch (error) {
       console.error('Error deleting employee:', error);
       setError(error.message || 'Failed to delete employee');
     } finally {
       setDeleting(false);
     }
-  }, [currentPage, employeeToDelete, loadEmployees, searchTerm]);
+  }, [currentPage, employeeToDelete, loadEmployees, rows, searchTerm, selectedCompanyId]);
 
   const handleOpenSyncModal = useCallback(() => {
     setShowSyncModal(true);
@@ -678,7 +767,7 @@ const EmployeeList = () => {
       setInfoMessage(
         'Sinkronisasi karyawan sedang diproses. Data akan diperbarui setelah backend menyelesaikan proses.'
       );
-      loadEmployees(currentPage, searchTerm);
+      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
     } catch (syncError) {
       console.error('Error syncing employees:', syncError);
       setShowSyncModal(false);
@@ -687,7 +776,7 @@ const EmployeeList = () => {
     } finally {
       setSyncing(false);
     }
-  }, [currentPage, loadEmployees, searchTerm]);
+  }, [currentPage, loadEmployees, rows, searchTerm, selectedCompanyId]);
 
   const handleCreateEmployee = useCallback(() => {
     navigate('/employees/create');
@@ -865,7 +954,7 @@ const EmployeeList = () => {
         <CCardBody className="p-4">
           <div className="filter-card mb-4">
             <CRow className="g-3 align-items-center">
-              <CCol lg={8}>
+              <CCol lg={7}>
                 <div className="search-container">
                   <CInputGroup className="search-input-group">
                     <CInputGroupText>
@@ -936,7 +1025,7 @@ const EmployeeList = () => {
                       color="light"
                       className="text-danger"
                       onClick={handleResetSearch}
-                      disabled={!trimmedSearchTerm && !trimmedSearchInput}
+                      disabled={!trimmedSearchTerm && !trimmedSearchInput && !selectedCompanyId}
                     >
                       <CIcon icon={cilTrash} className="me-2" />
                       Reset
@@ -978,8 +1067,34 @@ const EmployeeList = () => {
                   )}
                 </div>
               </CCol>
-              <CCol lg={4}>
-                <div className="d-flex flex-wrap align-items-center justify-content-lg-end gap-3">
+              <CCol lg={5}>
+                <div className="d-flex flex-wrap align-items-end justify-content-lg-end gap-3">
+                  <div className="flex-grow-1" style={{ minWidth: '220px' }}>
+                    <div className="stat-card__label mb-1">Company</div>
+                    <CFormSelect
+                      size="sm"
+                      value={selectedCompanyId}
+                      onChange={handleCompanyFilterChange}
+                      disabled={companyOptionsLoading}
+                    >
+                      <option value="">All Companies</option>
+                      {companyOptionsLoading && (
+                        <option disabled>Loading companies...</option>
+                      )}
+                      {!companyOptionsLoading && companyOptions.length === 0 && (
+                        <option disabled>No active companies available</option>
+                      )}
+                      {!companyOptionsLoading &&
+                        companyOptions.map((option) => (
+                          <option key={option.value} value={String(option.value)}>
+                            {option.label}
+                          </option>
+                        ))}
+                    </CFormSelect>
+                    {companyFilterError && (
+                      <small className="text-warning d-block mt-1">{companyFilterError}</small>
+                    )}
+                  </div>
                   <div>
                     <div className="stat-card__label mb-1">Rows per page</div>
                     <CFormSelect
@@ -1151,22 +1266,22 @@ const EmployeeList = () => {
                   <CTableDataCell colSpan={7} className="text-center py-5">
                     <div className="py-4">
                       <CIcon
-                        icon={trimmedSearchTerm ? cilMagnifyingGlass : cilPeople}
+                        icon={trimmedSearchTerm || selectedCompanyId ? cilMagnifyingGlass : cilPeople}
                         className="text-primary mb-3"
                         size="xl"
                       />
                       <h5 className="fw-semibold mb-2">
-                        {trimmedSearchTerm ? 'No matching employees' : 'No employees on record yet'}
+                        {trimmedSearchTerm || selectedCompanyId ? 'No matching employees' : 'No employees on record yet'}
                       </h5>
                       <p className="text-medium-emphasis mb-4">
-                        {trimmedSearchTerm
-                          ? 'Adjust your keywords or clear the search to see the full directory.'
+                        {trimmedSearchTerm || selectedCompanyId
+                          ? 'Adjust your filters or clear them to see the full directory.'
                           : 'Start building your organisation by adding your first employee profile.'}
                       </p>
                       <div className="d-flex justify-content-center gap-3 flex-wrap">
-                        {trimmedSearchTerm && (
+                        {(trimmedSearchTerm || selectedCompanyId) && (
                           <CButton color="link" className="text-decoration-none" onClick={handleResetSearch}>
-                            Clear search
+                            Clear filters
                           </CButton>
                         )}
                         {hasPermission(PERMISSIONS.EMPLOYEES_CREATE) && (

@@ -61,8 +61,15 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import { formatDate, formatDateTime, formatPhoneNumber } from '../../../utils/formatters';
 import { PERMISSIONS } from '../../../constants/userRoles';
+import { CALCULATION_TYPES } from '../../../constants/payrollConstants';
 import employeeService from '../services/employeeService';
 import employeeComponentService from '../services/employeeComponentService';
+
+const getComponentCalculationType = (component) =>
+  (component.mainComponent?.calculation_type || component.calculation_type || '').toLowerCase();
+
+const isAutomaticComponent = (component) =>
+  getComponentCalculationType(component) === CALCULATION_TYPES.AUTO;
 
 const EmployeeDetail = () => {
   const { id } = useParams();
@@ -179,6 +186,10 @@ const EmployeeDetail = () => {
 
   // Handle component edit
   const handleEditComponent = (component) => {
+    if (isAutomaticComponent(component)) {
+      return;
+    }
+
     setEditingComponent(component.employee_component_id);
     setComponentForm({
       amount: component.amount || 0,
@@ -765,7 +776,7 @@ const EmployeeDetail = () => {
                                             </CBadge>
                                           </CTableDataCell>
                                           <CTableDataCell>
-                                            {editingComponent === component.employee_component_id ? (
+                                            {editingComponent === component.employee_component_id && !isAutomaticComponent(component) ? (
                                               <CFormInput
                                                 type="number"
                                                 value={componentForm.amount}
@@ -786,7 +797,7 @@ const EmployeeDetail = () => {
                                             )}
                                           </CTableDataCell>
                                           <CTableDataCell>
-                                            {editingComponent === component.employee_component_id ? (
+                                            {editingComponent === component.employee_component_id && !isAutomaticComponent(component) ? (
                                               <CFormSwitch
                                                 checked={componentForm.is_active}
                                                 onChange={(e) => handleComponentFormChange('is_active', e.target.checked)}
@@ -799,7 +810,7 @@ const EmployeeDetail = () => {
                                             )}
                                           </CTableDataCell>
                                           <CTableDataCell>
-                                            {editingComponent === component.employee_component_id ? (
+                                            {editingComponent === component.employee_component_id && !isAutomaticComponent(component) ? (
                                               <div className="d-flex gap-1">
                                                 <CButton 
                                                   color="success" 
@@ -820,6 +831,12 @@ const EmployeeDetail = () => {
                                               <CButton 
                                                 color="primary" 
                                                 size="sm"
+                                                disabled={isAutomaticComponent(component)}
+                                                title={
+                                                  isAutomaticComponent(component)
+                                                    ? 'Automatic calculation components cannot be edited'
+                                                    : 'Edit component'
+                                                }
                                                 onClick={() => handleEditComponent(component)}
                                               >
                                                 <CIcon icon={cilPencil} size="sm" />

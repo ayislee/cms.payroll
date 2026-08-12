@@ -1475,8 +1475,8 @@ const EmployeeList = () => {
               <strong>{employeeToDelete.name}</strong> ({employeeToDelete.nik})?
               <br />
               <br />
-              <small className="text-danger">
-                This action cannot be undone.
+              <small className="text-medium-emphasis">
+                This will soft-delete the employee: the record is hidden from employee lists and disabled for new payroll processing, while historical payroll data remains intact.
               </small>
             </>
           )}

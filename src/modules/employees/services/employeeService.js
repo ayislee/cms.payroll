@@ -157,7 +157,7 @@ class EmployeeService {
   async deleteEmployee(id) {
     try {
       const response = await apiClient.delete(API_ENDPOINTS.EMPLOYEES.DELETE(id));
-      return response.data;
+      return response.data || response;
     } catch (error) {
       throw this.handleError(error);
     }

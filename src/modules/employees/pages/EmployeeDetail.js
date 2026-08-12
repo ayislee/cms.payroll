@@ -901,8 +901,8 @@ const EmployeeDetail = () => {
           <strong>{employee.name}</strong> ({employee.nik})?
           <br />
           <br />
-          <small className="text-danger">
-            This action cannot be undone. All related payroll data will also be affected.
+          <small className="text-medium-emphasis">
+            This will soft-delete the employee: the record is hidden from employee lists and disabled for new payroll processing, while historical payroll data remains intact.
           </small>
         </CModalBody>
         <CModalFooter>

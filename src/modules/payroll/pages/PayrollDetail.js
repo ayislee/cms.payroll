@@ -96,16 +96,16 @@ const PayrollDetail = () => {
     if (isPrinted && isEmailed) {
       return (
         <>
-          <CBadge color="success" className="me-1">Printed</CBadge>
+          <CBadge color="success" className="me-1">Checked</CBadge>
           <CBadge color="success">Emailed</CBadge>
         </>
       );
     } else if (isPrinted) {
-      return <CBadge color="success">Printed</CBadge>;
+      return <CBadge color="success">Checked</CBadge>;
     } else if (isEmailed) {
       return <CBadge color="success">Emailed</CBadge>;
     } else {
-      return <CBadge color="secondary">Not Processed</CBadge>;
+      return <CBadge color="secondary">Needs Check</CBadge>;
     }
   };
 

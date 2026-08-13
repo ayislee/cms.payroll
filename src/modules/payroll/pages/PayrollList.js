@@ -532,6 +532,7 @@ const generatePayroll = async (e) => {
   const [massEmailConfirmPayload, setMassEmailConfirmPayload] = useState(null);
   const [emailingSlipId, setEmailingSlipId] = useState(null);
   const [emailConfirmTarget, setEmailConfirmTarget] = useState(null);
+  const [checkingPayrollId, setCheckingPayrollId] = useState(null);
 
   const openMassGenerateModal = () => {
     setMassPayrollPeriod('');
@@ -925,6 +926,40 @@ const generatePayroll = async (e) => {
     }
   };
 
+  const handleManualCheckPayroll = async (payroll) => {
+    if (!payroll?.payroll_id) {
+      showToast('Invalid payroll selected.', 'danger');
+      return;
+    }
+
+    const nextChecked = !Boolean(payroll.is_printed);
+
+    try {
+      setCheckingPayrollId(payroll.payroll_id);
+      await payrollService.updatePayroll(payroll.payroll_id, {
+        is_printed: nextChecked
+      });
+
+      setPayrolls((previousPayrolls) => previousPayrolls.map((item) => (
+        item.payroll_id === payroll.payroll_id
+          ? { ...item, is_printed: nextChecked }
+          : item
+      )));
+
+      showToast(
+        nextChecked
+          ? 'Payroll marked as checked and locked for regeneration.'
+          : 'Payroll reopened for correction.',
+        'success'
+      );
+    } catch (error) {
+      console.error('Error updating payroll check status:', error);
+      showToast(error.message || 'Failed to update payroll check status.', 'danger');
+    } finally {
+      setCheckingPayrollId(null);
+    }
+  };
+
   // Show toast notification
   const showToast = (message, color = 'success') => {
     setToast({
@@ -1098,14 +1133,14 @@ const generatePayroll = async (e) => {
                         <CIcon icon={cilCheckCircle} className="text-info" />
                       </div>
                       <div>
-                        <div className="text-uppercase text-medium-emphasis small">Slip Status</div>
+                        <div className="text-uppercase text-medium-emphasis small">Manual Check</div>
                         <div className="fs-5 fw-semibold">
-                          {summaryMetrics.printedCount.toLocaleString('id-ID')} printed
+                          {summaryMetrics.printedCount.toLocaleString('id-ID')} checked
                         </div>
                       </div>
                     </div>
                     <div className="small text-medium-emphasis">
-                      {summaryMetrics.printedCount.toLocaleString('id-ID')} of {payrolls.length.toLocaleString('id-ID')} payrolls have printable slips.
+                      {summaryMetrics.printedCount.toLocaleString('id-ID')} of {payrolls.length.toLocaleString('id-ID')} payrolls have been manually checked.
                     </div>
                   </div>
                 </CCol>
@@ -1257,7 +1292,7 @@ const generatePayroll = async (e) => {
                             <CTableDataCell>
                               <div className="d-flex flex-wrap gap-2">
                                 <CBadge color={payroll.is_printed ? 'success' : 'warning'}>
-                                  {payroll.is_printed ? 'Slip ready' : 'Slip pending'}
+                                  {payroll.is_printed ? 'Checked' : 'Needs check'}
                                 </CBadge>
                                 <CBadge color={hasSlipFile ? 'info' : 'secondary'}>
                                   {hasSlipFile ? 'File available' : 'No file'}
@@ -1319,6 +1354,30 @@ const generatePayroll = async (e) => {
                                     <CIcon icon={cilCloudDownload} size="sm" />
                                   </CButton>
                                 )}
+                                <CButton
+                                  color={payroll.is_printed ? 'warning' : 'success'}
+                                  size="sm"
+                                  title={
+                                    payroll.is_printed
+                                      ? 'Reopen payroll for correction'
+                                      : hasSlipFile
+                                        ? 'Mark payroll as checked'
+                                        : 'Generate slip before checking payroll'
+                                  }
+                                  disabled={
+                                    checkingPayrollId === payroll.payroll_id ||
+                                    (!payroll.is_printed && !hasSlipFile)
+                                  }
+                                  onClick={() => handleManualCheckPayroll(payroll)}
+                                >
+                                  {checkingPayrollId === payroll.payroll_id ? (
+                                    <CSpinner size="sm" />
+                                  ) : payroll.is_printed ? (
+                                    <CIcon icon={cilLoopCircular} size="sm" />
+                                  ) : (
+                                    <CIcon icon={cilCheckCircle} size="sm" />
+                                  )}
+                                </CButton>
                                 <CButton
                                   color="success"
                                   size="sm"

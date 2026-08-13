@@ -71,6 +71,16 @@ const PayrollDetail = () => {
     }).format(amount || 0);
   };
 
+  const formatPercentage = (value) => {
+    const numeric = Number(value || 0);
+    return `${numeric.toLocaleString('id-ID', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 4
+    })}%`;
+  };
+
+  const isTruthy = (value) => value === true || value === 1 || value === '1' || value === 'true';
+
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('id-ID', {
@@ -163,10 +173,15 @@ const PayrollDetail = () => {
   // Separate earnings and deductions
   const earnings = payroll.payroll.payrollDetails.filter(detail => detail.mainComponent.type === 'Earning');
   const deductions = payroll.payroll.payrollDetails.filter(detail => detail.mainComponent.type === 'Deduction');
+  const benefits = payroll.payroll.payrollBenefits || [];
   
   // Calculate totals
   const totalEarning = earnings.reduce((sum, detail) => sum + (detail.amount || 0), 0);
   const totalDeduction = deductions.reduce((sum, detail) => sum + (detail.amount || 0), 0);
+  const totalEmployeeBenefit = benefits.reduce((sum, benefit) => sum + Number(benefit.employee_amount || 0), 0);
+  const totalEmployerBenefit = benefits.reduce((sum, benefit) => sum + Number(benefit.employer_amount || 0), 0);
+  const totalBenefit = benefits.reduce((sum, benefit) => sum + Number(benefit.total_amount || 0), 0);
+  const totalTaxableBenefit = benefits.reduce((sum, benefit) => sum + Number(benefit.taxable_amount || 0), 0);
   const companyLabel = getCompanyLabel(payroll.payroll);
   const companyEmail =
     payroll.payroll.employee?.company?.email ||
@@ -300,6 +315,64 @@ const PayrollDetail = () => {
               </CTable>
             </div>
 
+            {/* Benefits */}
+            <div className="border rounded p-3 mb-4">
+              <h5>Benefits</h5>
+              {benefits.length > 0 ? (
+                <CTable responsive>
+                  <CTableHead>
+                    <CTableRow>
+                      <CTableHeaderCell>Benefit</CTableHeaderCell>
+                      <CTableHeaderCell>Type</CTableHeaderCell>
+                      <CTableHeaderCell className="text-end">Base</CTableHeaderCell>
+                      <CTableHeaderCell className="text-end">Employee %</CTableHeaderCell>
+                      <CTableHeaderCell className="text-end">Employer %</CTableHeaderCell>
+                      <CTableHeaderCell className="text-end">Employee Amount</CTableHeaderCell>
+                      <CTableHeaderCell className="text-end">Employer Amount</CTableHeaderCell>
+                      <CTableHeaderCell className="text-end">Taxable</CTableHeaderCell>
+                      <CTableHeaderCell className="text-end">Total</CTableHeaderCell>
+                    </CTableRow>
+                  </CTableHead>
+                  <CTableBody>
+                    {benefits.map((benefit) => (
+                      <CTableRow key={benefit.payroll_benefit_id}>
+                        <CTableDataCell>
+                          <div className="fw-semibold">{benefit.benefit_name || 'Benefit'}</div>
+                          {benefit.company_benefit_id && (
+                            <div className="small text-medium-emphasis">
+                              Company Benefit #{benefit.company_benefit_id}
+                            </div>
+                          )}
+                        </CTableDataCell>
+                        <CTableDataCell>{benefit.benefit_type || '-'}</CTableDataCell>
+                        <CTableDataCell className="text-end">{formatCurrency(benefit.base_amount)}</CTableDataCell>
+                        <CTableDataCell className="text-end">{formatPercentage(benefit.employee_percentage)}</CTableDataCell>
+                        <CTableDataCell className="text-end">{formatPercentage(benefit.employer_percentage)}</CTableDataCell>
+                        <CTableDataCell className="text-end">{formatCurrency(benefit.employee_amount)}</CTableDataCell>
+                        <CTableDataCell className="text-end">{formatCurrency(benefit.employer_amount)}</CTableDataCell>
+                        <CTableDataCell className="text-end">
+                          <div>{formatCurrency(benefit.taxable_amount)}</div>
+                          <CBadge color={isTruthy(benefit.is_taxable) ? 'warning' : 'secondary'}>
+                            {isTruthy(benefit.is_taxable) ? 'Taxable' : 'Non-taxable'}
+                          </CBadge>
+                        </CTableDataCell>
+                        <CTableDataCell className="text-end">{formatCurrency(benefit.total_amount)}</CTableDataCell>
+                      </CTableRow>
+                    ))}
+                    <CTableRow className="table-active">
+                      <CTableDataCell colSpan="5" className="text-end"><strong>Total Benefits:</strong></CTableDataCell>
+                      <CTableDataCell className="text-end"><strong>{formatCurrency(totalEmployeeBenefit)}</strong></CTableDataCell>
+                      <CTableDataCell className="text-end"><strong>{formatCurrency(totalEmployerBenefit)}</strong></CTableDataCell>
+                      <CTableDataCell className="text-end"><strong>{formatCurrency(totalTaxableBenefit)}</strong></CTableDataCell>
+                      <CTableDataCell className="text-end"><strong>{formatCurrency(totalBenefit)}</strong></CTableDataCell>
+                    </CTableRow>
+                  </CTableBody>
+                </CTable>
+              ) : (
+                <p className="text-medium-emphasis mb-0">No benefits recorded for this payroll.</p>
+              )}
+            </div>
+
             {/* Summary */}
             <div className="border rounded p-3">
               <CRow>
@@ -309,11 +382,19 @@ const PayrollDetail = () => {
                     <>
                       <p><strong>Total Earnings:</strong> {formatCurrency(payroll.summary.total_earning)}</p>
                       <p><strong>Total Deductions:</strong> {formatCurrency(payroll.summary.total_deduction)}</p>
+                      <p><strong>Employee Benefit:</strong> {formatCurrency(payroll.summary.employee_benefit_total)}</p>
+                      <p><strong>Employer Benefit:</strong> {formatCurrency(payroll.summary.employer_benefit_total)}</p>
+                      <p><strong>Total Benefit:</strong> {formatCurrency(payroll.summary.benefit_total)}</p>
+                      <p><strong>Taxable Benefit:</strong> {formatCurrency(payroll.summary.taxable_benefit_total)}</p>
                     </>
                   ) : (
                     <>
                       <p><strong>Total Earnings:</strong> {formatCurrency(totalEarning)}</p>
                       <p><strong>Total Deductions:</strong> {formatCurrency(totalDeduction)}</p>
+                      <p><strong>Employee Benefit:</strong> {formatCurrency(totalEmployeeBenefit)}</p>
+                      <p><strong>Employer Benefit:</strong> {formatCurrency(totalEmployerBenefit)}</p>
+                      <p><strong>Total Benefit:</strong> {formatCurrency(totalBenefit)}</p>
+                      <p><strong>Taxable Benefit:</strong> {formatCurrency(totalTaxableBenefit)}</p>
                     </>
                   )}
                 </CCol>

@@ -153,6 +153,21 @@ class EmployeeService {
     }
   }
 
+  async updateEmployeeStatus(id, companyId, isActive) {
+    try {
+      const requestData = {
+        employee_id: parseInt(id),
+        company_id: companyId ? Number(companyId) : undefined,
+        status: isActive ? 'active' : 'not_active'
+      };
+
+      const response = await apiClient.put(API_ENDPOINTS.EMPLOYEES.UPDATE, requestData);
+      return response.data || response;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   // Delete employee
   async deleteEmployee(id) {
     try {

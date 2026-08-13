@@ -86,14 +86,17 @@ const searchStyles = `
   .search-suggestions {
     border: 1px solid #dee2e6;
     border-radius: 0.375rem;
+    background-color: #fff;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
     max-height: 300px;
     overflow-y: auto;
+    z-index: 1050;
   }
 
   .search-suggestion-item {
     padding: 0.75rem;
     border-bottom: 1px solid #f1f3f4;
+    background-color: #fff;
     transition: background-color 0.15s ease-in-out;
   }
 
@@ -236,14 +239,80 @@ const searchStyles = `
   }
 
   .filter-card {
-    border-radius: 0.9rem;
+    border-radius: 0.5rem;
     border: 1px solid #e5e7eb;
-    background-color: #f9fafb;
-    padding: 1.5rem;
+    background-color: #fff;
+    padding: 1.25rem;
+  }
+
+  .filter-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  .filter-card__title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .filter-card__meta {
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+
+  .employee-filter-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 2fr) minmax(220px, 1fr) minmax(150px, 0.7fr) minmax(120px, 0.55fr);
+    gap: 1rem;
+    align-items: end;
+  }
+
+  .employee-filter-field {
+    min-width: 0;
+  }
+
+  .employee-filter-label {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: #6b7280;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .employee-filter-control {
+    min-height: 38px;
+    border-color: #d1d5db;
+  }
+
+  .employee-filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    border-top: 1px solid #eef2f7;
+  }
+
+  .employee-filter-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    white-space: nowrap;
   }
 
   .search-input-group {
-    border-radius: 0.9rem;
+    min-height: 38px;
+    border-radius: 0.5rem;
     border: 1px solid #d1d5db;
     background-color: #fff;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -295,6 +364,36 @@ const searchStyles = `
 
   .spin {
     animation: spin 1s linear infinite;
+  }
+
+  @media (max-width: 1199.98px) {
+    .employee-filter-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .employee-filter-field--search {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .filter-card {
+      padding: 1rem;
+    }
+
+    .filter-card__header,
+    .employee-filter-actions {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .employee-filter-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .employee-filter-actions .btn {
+      width: 100%;
+    }
   }
 
   @keyframes spin {
@@ -369,6 +468,7 @@ const EmployeeList = () => {
 
   const trimmedSearchTerm = searchTerm.trim();
   const trimmedSearchInput = searchInput.trim();
+  const activeFilterCount = [trimmedSearchTerm, selectedCompanyId, selectedPtkp].filter(Boolean).length;
 
   const selectedCompanyLabel = useMemo(() => {
     if (!selectedCompanyId) return '';
@@ -1030,14 +1130,32 @@ const EmployeeList = () => {
       <CCard className="border-0 shadow-sm">
         <CCardBody className="p-4">
           <div className="filter-card mb-4">
-            <CRow className="g-3 align-items-center">
-              <CCol lg={7}>
+            <div className="filter-card__header">
+              <div>
+                <div className="filter-card__title">Filters</div>
+                <div className="filter-card__meta">
+                  {activeFilterCount > 0 ? `${activeFilterCount} active filter${activeFilterCount > 1 ? 's' : ''}` : 'No filters applied'}
+                </div>
+              </div>
+              {activeFilterCount > 0 && (
+                <CBadge color="primary" className="px-3 py-2">
+                  Active
+                </CBadge>
+              )}
+            </div>
+
+            <div className="employee-filter-grid">
+              <div className="employee-filter-field employee-filter-field--search">
+                <label className="employee-filter-label" htmlFor="employee-search-input">
+                  Search
+                </label>
                 <div className="search-container">
                   <CInputGroup className="search-input-group">
                     <CInputGroupText>
                       <CIcon icon={cilMagnifyingGlass} />
                     </CInputGroupText>
                     <CFormInput
+                      id="employee-search-input"
                       placeholder="Search by name, NIK, email or phone..."
                       value={searchInput}
                       onChange={handleSearchInputChange}
@@ -1050,7 +1168,7 @@ const EmployeeList = () => {
                     />
                     <div className="search-history-container">
                       <CDropdown alignment="end" visible={showSearchHistory} onToggle={setShowSearchHistory}>
-                        <CDropdownToggle color="light" className="shadow-none px-3">
+                        <CDropdownToggle color="light" className="shadow-none px-3" title="Search history">
                           <CIcon icon={cilClock} />
                         </CDropdownToggle>
                         <CDropdownMenu className="w-100">
@@ -1080,33 +1198,6 @@ const EmployeeList = () => {
                         </CDropdownMenu>
                       </CDropdown>
                     </div>
-                    <CButton
-                      color="primary"
-                      variant="outline"
-                      onClick={handleApplySearch}
-                      disabled={loading || trimmedSearchInput === trimmedSearchTerm}
-                    >
-                      {isSearching ? (
-                        <>
-                          <CSpinner size="sm" className="me-2" />
-                          Filtering...
-                        </>
-                      ) : (
-                        <>
-                          <CIcon icon={cilMagnifyingGlass} className="me-2" />
-                          Apply
-                        </>
-                      )}
-                    </CButton>
-                    <CButton
-                      color="light"
-                      className="text-danger"
-                      onClick={handleResetSearch}
-                      disabled={!trimmedSearchTerm && !trimmedSearchInput && !selectedCompanyId && !selectedPtkp}
-                    >
-                      <CIcon icon={cilTrash} className="me-2" />
-                      Reset
-                    </CButton>
                   </CInputGroup>
                   {showSuggestions && searchSuggestions.length > 0 && (
                     <div className="position-relative">
@@ -1143,98 +1234,133 @@ const EmployeeList = () => {
                     </small>
                   )}
                 </div>
-              </CCol>
-              <CCol lg={5}>
-                <div className="d-flex flex-wrap align-items-end justify-content-lg-end gap-3">
-                  <div className="flex-grow-1" style={{ minWidth: '220px' }}>
-                    <div className="stat-card__label mb-1">Company</div>
-                    <CFormSelect
-                      size="sm"
-                      value={selectedCompanyId}
-                      onChange={handleCompanyFilterChange}
-                      disabled={companyOptionsLoading}
-                    >
-                      <option value="">All Companies</option>
-                      {companyOptionsLoading && (
-                        <option disabled>Loading companies...</option>
-                      )}
-                      {!companyOptionsLoading && companyOptions.length === 0 && (
-                        <option disabled>No active companies available</option>
-                      )}
-                      {!companyOptionsLoading &&
-                        companyOptions.map((option) => (
-                          <option key={option.value} value={String(option.value)}>
-                            {option.label}
-                          </option>
-                        ))}
-                    </CFormSelect>
-                    {companyFilterError && (
-                      <small className="text-warning d-block mt-1">{companyFilterError}</small>
-                    )}
-                  </div>
-                  <div style={{ minWidth: '160px' }}>
-                    <div className="stat-card__label mb-1">PTKP</div>
-                    <CFormSelect
-                      size="sm"
-                      value={selectedPtkp}
-                      onChange={handlePtkpFilterChange}
-                      disabled={ptkpOptionsLoading}
-                    >
-                      <option value="">All PTKP</option>
-                      {ptkpOptionsLoading && (
-                        <option disabled>Loading PTKP...</option>
-                      )}
-                      {!ptkpOptionsLoading && ptkpOptions.length === 0 && (
-                        <option disabled>No PTKP filled</option>
-                      )}
-                      {!ptkpOptionsLoading &&
-                        ptkpOptions.map((ptkp) => (
-                          <option key={ptkp} value={ptkp}>
-                            {resolvePTKPLabel(ptkp)}
-                          </option>
-                        ))}
-                    </CFormSelect>
-                    {ptkpFilterError && (
-                      <small className="text-warning d-block mt-1">{ptkpFilterError}</small>
-                    )}
-                  </div>
-                  <div>
-                    <div className="stat-card__label mb-1">Rows per page</div>
-                    <CFormSelect
-                      size="sm"
-                      value={rows}
-                      onChange={(e) => handleRowsChange(Number(e.target.value))}
-                      style={{ minWidth: '100px' }}
-                    >
-                      {config.pagination.pageSizeOptions.map((size) => (
-                        <option key={size} value={size}>
-                          {size}
-                        </option>
-                      ))}
-                    </CFormSelect>
-                  </div>
-                  <CButton
-                    color="secondary"
-                    variant="outline"
-                    onClick={handleRefresh}
-                    disabled={loading}
-                    className="d-flex align-items-center"
-                  >
-                    {loading ? (
-                      <>
-                        <CSpinner size="sm" className="me-2" />
-                        Refreshing
-                      </>
-                    ) : (
-                      <>
-                        <CIcon icon={cilReload} className="me-2" />
-                        Refresh
-                      </>
-                    )}
-                  </CButton>
-                </div>
-              </CCol>
-            </CRow>
+              </div>
+
+              <div className="employee-filter-field">
+                <label className="employee-filter-label" htmlFor="employee-company-filter">
+                  Company
+                </label>
+                <CFormSelect
+                  id="employee-company-filter"
+                  className="employee-filter-control"
+                  value={selectedCompanyId}
+                  onChange={handleCompanyFilterChange}
+                  disabled={companyOptionsLoading}
+                >
+                  <option value="">All Companies</option>
+                  {companyOptionsLoading && (
+                    <option disabled>Loading companies...</option>
+                  )}
+                  {!companyOptionsLoading && companyOptions.length === 0 && (
+                    <option disabled>No active companies available</option>
+                  )}
+                  {!companyOptionsLoading &&
+                    companyOptions.map((option) => (
+                      <option key={option.value} value={String(option.value)}>
+                        {option.label}
+                      </option>
+                    ))}
+                </CFormSelect>
+                {companyFilterError && (
+                  <small className="text-warning d-block mt-1">{companyFilterError}</small>
+                )}
+              </div>
+
+              <div className="employee-filter-field">
+                <label className="employee-filter-label" htmlFor="employee-ptkp-filter">
+                  PTKP
+                </label>
+                <CFormSelect
+                  id="employee-ptkp-filter"
+                  className="employee-filter-control"
+                  value={selectedPtkp}
+                  onChange={handlePtkpFilterChange}
+                  disabled={ptkpOptionsLoading}
+                >
+                  <option value="">All PTKP</option>
+                  {ptkpOptionsLoading && (
+                    <option disabled>Loading PTKP...</option>
+                  )}
+                  {!ptkpOptionsLoading && ptkpOptions.length === 0 && (
+                    <option disabled>No PTKP filled</option>
+                  )}
+                  {!ptkpOptionsLoading &&
+                    ptkpOptions.map((ptkp) => (
+                      <option key={ptkp} value={ptkp}>
+                        {resolvePTKPLabel(ptkp)}
+                      </option>
+                    ))}
+                </CFormSelect>
+                {ptkpFilterError && (
+                  <small className="text-warning d-block mt-1">{ptkpFilterError}</small>
+                )}
+              </div>
+
+              <div className="employee-filter-field">
+                <label className="employee-filter-label" htmlFor="employee-rows-filter">
+                  Rows
+                </label>
+                <CFormSelect
+                  id="employee-rows-filter"
+                  className="employee-filter-control"
+                  value={rows}
+                  onChange={(e) => handleRowsChange(Number(e.target.value))}
+                >
+                  {config.pagination.pageSizeOptions.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </CFormSelect>
+              </div>
+            </div>
+
+            <div className="employee-filter-actions">
+              <CButton
+                color="primary"
+                onClick={handleApplySearch}
+                disabled={loading || trimmedSearchInput === trimmedSearchTerm}
+              >
+                {isSearching ? (
+                  <>
+                    <CSpinner size="sm" className="me-2" />
+                    Filtering
+                  </>
+                ) : (
+                  <>
+                    <CIcon icon={cilMagnifyingGlass} className="me-2" />
+                    Apply
+                  </>
+                )}
+              </CButton>
+              <CButton
+                color="light"
+                className="text-danger border"
+                onClick={handleResetSearch}
+                disabled={!trimmedSearchTerm && !trimmedSearchInput && !selectedCompanyId && !selectedPtkp}
+              >
+                <CIcon icon={cilTrash} className="me-2" />
+                Reset
+              </CButton>
+              <CButton
+                color="secondary"
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <CSpinner size="sm" className="me-2" />
+                    Refreshing
+                  </>
+                ) : (
+                  <>
+                    <CIcon icon={cilReload} className="me-2" />
+                    Refresh
+                  </>
+                )}
+              </CButton>
+            </div>
           </div>
 
           {error && (

@@ -50,6 +50,19 @@ class EmployeeComponentService {
     }
   }
 
+  async toggleEmployeeComponentActive(componentId, isActive) {
+    try {
+      const response = await apiClient.put(API_ENDPOINTS.EMPLOYEE_COMPONENTS.TOGGLE_ACTIVE, {
+        employee_component_id: componentId,
+        is_active: Boolean(isActive)
+      });
+      return response.data || response;
+    } catch (error) {
+      console.error('Error toggling employee component status:', error);
+      throw this.handleError(error);
+    }
+  }
+
   // Get employee component by ID
   async getEmployeeComponentById(id) {
     try {

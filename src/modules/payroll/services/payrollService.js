@@ -14,7 +14,8 @@ class PayrollService {
         rows = 5,
         search = '',
         payroll_periode = '',
-        employee_name = ''
+        employee_name = '',
+        company_id = ''
       } = params;
 
       console.log('Payroll service params:', params);
@@ -27,6 +28,7 @@ class PayrollService {
       if (search) queryParams.append('search', search);
       if (payroll_periode) queryParams.append('payroll_periode', payroll_periode);
       if (employee_name) queryParams.append('employee_name', employee_name);
+      if (company_id) queryParams.append('company_id', company_id);
 
       const url = `${API_ENDPOINTS.PAYROLL.LIST}?${queryParams.toString()}`;
       console.log('Fetching payrolls with URL:', url);
@@ -64,6 +66,29 @@ class PayrollService {
       };
     } catch (error) {
       console.error('Error fetching payrolls:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  async getPayrollPeriodOptions(companyId = '') {
+    try {
+      const queryParams = new URLSearchParams();
+      if (companyId) queryParams.append('company_id', companyId);
+
+      const queryString = queryParams.toString();
+      const url = queryString
+        ? `${API_ENDPOINTS.PAYROLL.PERIOD_OPTIONS}?${queryString}`
+        : API_ENDPOINTS.PAYROLL.PERIOD_OPTIONS;
+      const response = await apiClient.get(url);
+      const payload = response?.data || response;
+
+      if (Array.isArray(payload?.data)) {
+        return payload.data;
+      }
+
+      return Array.isArray(payload) ? payload : [];
+    } catch (error) {
+      console.error('Error fetching payroll period options:', error);
       throw this.handleError(error);
     }
   }
@@ -237,4 +262,3 @@ class PayrollService {
 const payrollService = new PayrollService();
 
 export default payrollService;
-

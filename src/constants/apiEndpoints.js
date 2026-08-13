@@ -42,7 +42,14 @@ export const API_ENDPOINTS = {
   EMPLOYEE_COMPONENTS: {
     LIST: (employeeId) => `${API_BASE}/payroll/employee/setting?employee_id=${employeeId}`,
     UPDATE: `${API_BASE}/payroll/employee/update`,
+    TOGGLE_ACTIVE: `${API_BASE}/payroll/employee/toggle-active`,
     DETAIL: (id) => `${API_BASE}/payroll/employee/get?employee_component_id=${id}`
+  },
+
+  // Employee Benefit Assignment Endpoints
+  EMPLOYEE_BENEFITS: {
+    LIST: (employeeId) => `${API_BASE}/employee-benefits?employee_id=${employeeId}`,
+    TOGGLE: `${API_BASE}/employee-benefits/toggle`
   },
 
   // Company Management Endpoints
@@ -86,6 +93,7 @@ export const API_ENDPOINTS = {
     MASS_GENERATE_SLIP: `${API_BASE}/payroll/slip/mass`,
     EMAIL_SLIP: `${API_BASE}/payroll/slip/email`,
     EMAIL_SLIP_MASS: `${API_BASE}/payroll/slip/email/mass`,
+    PERIOD_OPTIONS: `${API_BASE}/payroll/period-options`,
     DOWNLOAD: (periode) => `${API_BASE}/payroll/download/${periode}`,
     DOWNLOAD_FILE: `${API_BASE}/payroll/download/file`,
     UPDATE: (id) => `${API_BASE}/payroll/${id}`,

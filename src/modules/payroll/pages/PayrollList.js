@@ -34,8 +34,7 @@ import {
   CModalFooter,
   CToast,
   CToastBody,
-  CToastHeader,
-  CCollapse
+  CToastHeader
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import {
@@ -44,7 +43,6 @@ import {
   cilPrint,
   cilMoney,
   cilSearch,
-  cilFilter,
   cilCloudDownload,
   cilViewModule,
   cilLoopCircular,
@@ -58,6 +56,12 @@ import payrollService from '../services/payrollService';
 import employeeService from '../../employees/services/employeeService';
 import companyService from '../../companies/services/companyService';
 import config from '../../../config/environment';
+
+const emptySearchParams = {
+  search: '',
+  payroll_periode: '',
+  company_id: ''
+};
 
 // Error Boundary Component
 class PayrollListErrorBoundary extends React.Component {
@@ -106,12 +110,12 @@ const PayrollList = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [pageSize, setPageSize] = useState(15); // Default to 15 rows per page
-  const [searchParams, setSearchParams] = useState({
-    search: '',
-    payroll_periode: '',
-    employee_name: ''
-  });
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchParams, setSearchParams] = useState(emptySearchParams);
+  const [appliedSearchParams, setAppliedSearchParams] = useState(emptySearchParams);
+  const [hasLoadedPayrolls, setHasLoadedPayrolls] = useState(false);
+  const [periodOptions, setPeriodOptions] = useState([]);
+  const [periodOptionsLoading, setPeriodOptionsLoading] = useState(false);
+  const [periodOptionsError, setPeriodOptionsError] = useState('');
   
   // Generate Payroll Modal State
   const [showGeneratePayrollModal, setShowGeneratePayrollModal] = useState(false);
@@ -214,7 +218,7 @@ const PayrollList = () => {
       const serviceParams = {
         page: currentPage,
         rows: pageSize,
-        ...searchParams
+        ...appliedSearchParams
       };
 
       const response = await payrollService.getPayrolls(serviceParams);
@@ -237,13 +241,14 @@ const PayrollList = () => {
       showToast(error.message || 'Failed to load payrolls', 'danger');
     } finally {
       setLoading(false);
+      setHasLoadedPayrolls(true);
     }
   };
 
-  // Load payrolls when page or page size changes
+  // Load payrolls when page, page size, or applied filters change.
   useEffect(() => {
     loadPayrolls();
-  }, [currentPage, pageSize]);
+  }, [currentPage, pageSize, appliedSearchParams]);
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -261,30 +266,17 @@ const PayrollList = () => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
+    setAppliedSearchParams({
+      search: searchParams.search.trim(),
+      payroll_periode: searchParams.payroll_periode.trim(),
+      company_id: String(searchParams.company_id || '').trim()
+    });
     setCurrentPage(1);
-    loadPayrolls();
   };
 
-  // Auto-search with debounce to avoid too many API calls
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      if (searchParams.search || searchParams.payroll_periode || searchParams.employee_name) {
-        setCurrentPage(1);
-        loadPayrolls();
-      }
-    }, 500);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [searchParams]);
-
   const resetFilters = () => {
-    setSearchParams({
-      search: '',
-      payroll_periode: '',
-      employee_name: ''
-    });
+    setSearchParams(emptySearchParams);
+    setAppliedSearchParams(emptySearchParams);
     setCurrentPage(1);
   };
 
@@ -298,12 +290,8 @@ const PayrollList = () => {
     setShowGeneratePayrollModal(true);
   };
 
-  // Handle modal close with confirmation
-  const handleModalClose = () => {
-    // Prevent modal from closing when clicking outside
-    // But allow closing via Cancel or Generate buttons
-    // Do nothing to prevent closing
-    // Modal can only be closed via explicit button actions
+  const closeGeneratePayrollModal = () => {
+    setShowGeneratePayrollModal(false);
   };
 
   // Search employees for the payroll modal
@@ -579,9 +567,9 @@ const generatePayroll = async (e) => {
       setMassGenerating(true);
       setMassGenerateError('');
 
-      await payrollService.generateMassPayroll(massPayrollPeriod.trim());
+      const result = await payrollService.generateMassPayroll(massPayrollPeriod.trim());
 
-      showToast('Mass payroll generation started successfully.', 'success');
+      showToast(result?.message || 'Mass payroll generation completed.', 'success');
       closeMassGenerateModal();
       await loadPayrolls();
     } catch (error) {
@@ -744,6 +732,39 @@ const generatePayroll = async (e) => {
       setMassEmailCompanyId(String(downloadCompanies[0].value));
     }
   }, [showMassEmailModal, massEmailCompanyId, downloadCompanies]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPeriodOptions = async () => {
+      try {
+        setPeriodOptionsLoading(true);
+        setPeriodOptionsError('');
+
+        const options = await payrollService.getPayrollPeriodOptions(searchParams.company_id);
+
+        if (isMounted) {
+          setPeriodOptions(options || []);
+        }
+      } catch (err) {
+        console.error('Error loading payroll period options:', err);
+        if (isMounted) {
+          setPeriodOptions([]);
+          setPeriodOptionsError('Period filter unavailable');
+        }
+      } finally {
+        if (isMounted) {
+          setPeriodOptionsLoading(false);
+        }
+      }
+    };
+
+    fetchPeriodOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [searchParams.company_id]);
 
   const handleMassSlipGenerate = async () => {
     if (!massSlipPeriod.trim()) {
@@ -964,7 +985,7 @@ const generatePayroll = async (e) => {
     setCurrentPage(1); // Reset to first page when changing page size
   };
 
-  if (loading) {
+  if (loading && !hasLoadedPayrolls) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: '300px' }}>
         <CSpinner color="primary" />
@@ -998,14 +1019,6 @@ const generatePayroll = async (e) => {
                   </p>
                 </div>
                 <div className="d-flex flex-wrap gap-2 justify-content-lg-end">
-                  <CButton
-                    color="secondary"
-                    variant="outline"
-                    onClick={() => setShowFilters(!showFilters)}
-                  >
-                    <CIcon icon={cilFilter} className="me-1" />
-                    {showFilters ? 'Hide Filters' : 'Show Filters'}
-                  </CButton>
                   <CButton
                     color="primary"
                     onClick={handleGeneratePayroll}
@@ -1118,21 +1131,67 @@ const generatePayroll = async (e) => {
 
               <CForm onSubmit={handleSearchSubmit} className="mb-4">
                 <CRow className="g-3 align-items-md-end">
-                  <CCol md={6}>
+                  <CCol lg={5}>
+                    <label className="form-label" htmlFor="payroll-search-filter">Search</label>
                     <CInputGroup>
                       <CInputGroupText>
                         <CIcon icon={cilSearch} />
                       </CInputGroupText>
                       <CFormInput
+                        id="payroll-search-filter"
                         type="text"
-                        placeholder="Search by period, employee, or keyword"
+                        placeholder="Search by employee name or email"
                         value={searchParams.search}
                         onChange={(e) => handleSearchChange('search', e.target.value)}
                       />
                     </CInputGroup>
                   </CCol>
-                  <CCol md={6}>
-                    <div className="d-grid gap-2 d-md-flex justify-content-md-end">
+                  <CCol sm={6} lg={3}>
+                    <label className="form-label" htmlFor="payroll-company-filter">Company</label>
+                    <CFormSelect
+                      id="payroll-company-filter"
+                      value={searchParams.company_id}
+                      onChange={(e) => handleSearchChange('company_id', e.target.value)}
+                    >
+                      <option value="">All Companies</option>
+                      {downloadCompanies.length === 0 ? (
+                        <option disabled>No active companies available</option>
+                      ) : (
+                        downloadCompanies.map((option) => (
+                          <option key={option.value} value={String(option.value)}>
+                            {option.label}
+                          </option>
+                        ))
+                      )}
+                    </CFormSelect>
+                  </CCol>
+                  <CCol sm={6} lg={2}>
+                    <label className="form-label" htmlFor="payroll-period-filter">Period</label>
+                    <CFormSelect
+                      id="payroll-period-filter"
+                      value={searchParams.payroll_periode}
+                      onChange={(e) => handleSearchChange('payroll_periode', e.target.value)}
+                      disabled={periodOptionsLoading}
+                    >
+                      <option value="">All Periods</option>
+                      {periodOptionsLoading ? (
+                        <option disabled>Loading periods...</option>
+                      ) : periodOptions.length === 0 ? (
+                        <option disabled>No periods available</option>
+                      ) : (
+                        periodOptions.map((option) => (
+                          <option key={option.value} value={String(option.value)}>
+                            {option.label || option.value}
+                          </option>
+                        ))
+                      )}
+                    </CFormSelect>
+                    {periodOptionsError && (
+                      <small className="text-warning d-block mt-1">{periodOptionsError}</small>
+                    )}
+                  </CCol>
+                  <CCol lg={2}>
+                    <div className="d-grid gap-2 d-sm-flex justify-content-lg-end">
                       <CButton type="submit" color="primary">
                         <CIcon icon={cilSearch} className="me-1" />
                         Search
@@ -1143,27 +1202,6 @@ const generatePayroll = async (e) => {
                     </div>
                   </CCol>
                 </CRow>
-
-                <CCollapse visible={showFilters} className="mt-3">
-                  <CRow className="g-3">
-                    <CCol md={6}>
-                      <CFormInput
-                        type="text"
-                        placeholder="Payroll Period (YYYYMM)"
-                        value={searchParams.payroll_periode}
-                        onChange={(e) => handleSearchChange('payroll_periode', e.target.value)}
-                      />
-                    </CCol>
-                    <CCol md={6}>
-                      <CFormInput
-                        type="text"
-                        placeholder="Employee Name"
-                        value={searchParams.employee_name}
-                        onChange={(e) => handleSearchChange('employee_name', e.target.value)}
-                      />
-                    </CCol>
-                  </CRow>
-                </CCollapse>
               </CForm>
 
               {payrolls.length > 0 ? (
@@ -1409,10 +1447,12 @@ const generatePayroll = async (e) => {
       {/* Generate Payroll Modal */}
       <CModal 
         visible={showGeneratePayrollModal} 
-        onClose={handleModalClose}
+        onClose={closeGeneratePayrollModal}
+        backdrop="static"
+        keyboard={false}
         size="lg"
       >
-        <CModalHeader>
+        <CModalHeader closeButton={false}>
           <CModalTitle>Generate Payroll</CModalTitle>
         </CModalHeader>
         <CModalBody>
@@ -1499,7 +1539,7 @@ const generatePayroll = async (e) => {
         <CModalFooter>
           <CButton
             color="secondary"
-            onClick={() => setShowGeneratePayrollModal(false)}
+            onClick={closeGeneratePayrollModal}
             disabled={generatingPayroll}
           >
             Cancel
@@ -1561,6 +1601,9 @@ const generatePayroll = async (e) => {
             />
             <small className="text-muted">
               Format: YYYYMM (e.g., 202501 for January 2025)
+            </small>
+            <small className="text-muted d-block mt-1">
+              Only employees with net pay greater than 0 will be generated. Employees with zero or negative net pay are skipped.
             </small>
           </div>
         </CModalBody>

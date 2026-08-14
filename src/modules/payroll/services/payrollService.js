@@ -94,12 +94,18 @@ class PayrollService {
   }
 
   // Generate payroll for an employee
-  async generatePayroll(employeeId, payrollPeriod) {
+  async generatePayroll(employeeId, payrollPeriod, companyId = '') {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.GENERATE, {
+      const payload = {
         employee_id: employeeId,
         payroll_periode: payrollPeriod
-      });
+      };
+
+      if (companyId) {
+        payload.company_id = companyId;
+      }
+
+      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.GENERATE, payload);
       return response.data || response;
     } catch (error) {
       console.error('Error generating payroll:', error);
@@ -108,12 +114,18 @@ class PayrollService {
   }
 
   // Generate slip for an employee
-  async generateSlip(employeeId, payrollPeriod) {
+  async generateSlip(employeeId, payrollPeriod, companyId = '') {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.GENERATE_SLIP, {
+      const payload = {
         employee_id: employeeId,
         payroll_periode: payrollPeriod
-      });
+      };
+
+      if (companyId) {
+        payload.company_id = companyId;
+      }
+
+      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.GENERATE_SLIP, payload);
       return response.data || response;
     } catch (error) {
       console.error('Error generating slip:', error);

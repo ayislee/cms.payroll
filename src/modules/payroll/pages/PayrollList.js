@@ -209,6 +209,34 @@ const PayrollList = () => {
     return '-';
   };
 
+  const getPayrollCompanyId = (payroll) => {
+    if (!payroll || typeof payroll !== 'object') {
+      return '';
+    }
+
+    const directCompanyId = payroll.company_id;
+    if (directCompanyId) {
+      return directCompanyId;
+    }
+
+    const payrollCompanyId = payroll.company?.company_id;
+    if (payrollCompanyId) {
+      return payrollCompanyId;
+    }
+
+    const employeeCompanyId = payroll.employee?.company_id;
+    if (employeeCompanyId) {
+      return employeeCompanyId;
+    }
+
+    const employeeCompanyRelationId = payroll.employee?.company?.company_id;
+    if (employeeCompanyRelationId) {
+      return employeeCompanyRelationId;
+    }
+
+    return '';
+  };
+
   useDocumentTitle('Payroll List');
 
   const loadPayrolls = async () => {
@@ -403,7 +431,11 @@ const generatePayroll = async (e) => {
       setPayrollError('');
       
       // Call the payroll service to generate the payroll
-     await payrollService.generatePayroll(selectedEmployee.employee_id, payrollPeriod);
+     await payrollService.generatePayroll(
+       selectedEmployee.employee_id,
+       payrollPeriod,
+       selectedEmployee.company_id || selectedEmployee.company?.company_id || ''
+     );
      
      // Close modal
      setShowGeneratePayrollModal(false);
@@ -443,7 +475,8 @@ const generatePayroll = async (e) => {
 
       const response = await payrollService.generateSlip(
         regenerateTarget.employee_id,
-        regeneratePeriod.trim()
+        regeneratePeriod.trim(),
+        getPayrollCompanyId(regenerateTarget)
       );
 
       const slipUrl =
@@ -485,7 +518,8 @@ const generatePayroll = async (e) => {
 
       const response = await payrollService.generatePayroll(
         rowPayrollTarget.employee_id,
-        rowPayrollPeriod.trim()
+        rowPayrollPeriod.trim(),
+        getPayrollCompanyId(rowPayrollTarget)
       );
 
       const slipUrl =
@@ -936,13 +970,24 @@ const generatePayroll = async (e) => {
 
     try {
       setCheckingPayrollId(payroll.payroll_id);
-      await payrollService.updatePayroll(payroll.payroll_id, {
+      const response = await payrollService.updatePayroll(payroll.payroll_id, {
         is_printed: nextChecked
       });
 
+      const updatedPayroll = response?.data || null;
+
       setPayrolls((previousPayrolls) => previousPayrolls.map((item) => (
         item.payroll_id === payroll.payroll_id
-          ? { ...item, is_printed: nextChecked }
+          ? {
+              ...item,
+              ...(updatedPayroll || {}),
+              is_printed: nextChecked,
+              ...(!nextChecked ? {
+                slip_url: null,
+                is_emailed: false,
+                is_posted: false
+              } : {})
+            }
           : item
       )));
 

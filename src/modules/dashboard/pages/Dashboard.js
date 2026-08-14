@@ -184,7 +184,12 @@ const Dashboard = () => {
 
   const payrollMetrics = overview?.metrics?.payroll || {
     total_records: 0,
+    checked_records: 0,
+    unchecked_records: 0,
     total_net_pay: 0,
+    checked_net_pay: 0,
+    unchecked_net_pay: 0,
+    projected_net_pay: 0,
     period: null,
     period_start: '',
     period_end: '',
@@ -504,7 +509,7 @@ const Dashboard = () => {
 
           {canViewPayroll && (
             <CRow className="mb-4">
-              <CCol sm={6} lg={4}>
+              <CCol sm={6} lg={4} xl={3}>
                 <CWidgetStatsA
                   className="mb-4"
                   color="info"
@@ -513,16 +518,34 @@ const Dashboard = () => {
                   action={<CIcon icon={cilClipboard} height={48} className="text-white-50" />}
                 />
               </CCol>
-              <CCol sm={6} lg={4}>
+              <CCol sm={6} lg={4} xl={3}>
                 <CWidgetStatsA
                   className="mb-4"
                   color="success"
-                  value={formatCurrency(payrollMetrics.total_net_pay, { maximumFractionDigits: 0 })}
-                  title="Total Net Pay"
+                  value={formatCurrency(payrollMetrics.checked_net_pay ?? payrollMetrics.total_net_pay, { maximumFractionDigits: 0 })}
+                  title="Total Net Pay Checked"
                   action={<CIcon icon={cilCash} height={48} className="text-white-50" />}
                 />
               </CCol>
-              <CCol sm={6} lg={4}>
+              <CCol sm={6} lg={4} xl={3}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="warning"
+                  value={formatCurrency(payrollMetrics.unchecked_net_pay, { maximumFractionDigits: 0 })}
+                  title="Total Net Pay Belum Check"
+                  action={<CIcon icon={cilWarning} height={48} className="text-white-50" />}
+                />
+              </CCol>
+              <CCol sm={6} lg={4} xl={3}>
+                <CWidgetStatsA
+                  className="mb-4"
+                  color="primary"
+                  value={formatCurrency(payrollMetrics.projected_net_pay, { maximumFractionDigits: 0 })}
+                  title="Total Proyeksi Net Pay"
+                  action={<CIcon icon={cilChart} height={48} className="text-white-50" />}
+                />
+              </CCol>
+              <CCol sm={6} lg={4} xl={3}>
                 <CWidgetStatsA
                   className="mb-4"
                   color="dark"

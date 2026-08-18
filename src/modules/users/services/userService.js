@@ -129,7 +129,7 @@ const prepareUserPayload = (data) => {
     delete payload.company;
   }
 
-  if (payload.type !== USER_ROLES.USER || payload.company_id === '' || payload.company_id === undefined || payload.company_id === null) {
+  if (payload.company_id === '' || payload.company_id === undefined || payload.company_id === null) {
     delete payload.company_id;
   } else {
     const parsedCompanyId = Number(payload.company_id);

@@ -136,8 +136,14 @@ if (typeof document !== 'undefined' && !document.getElementById('user-form-style
 const UserForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user: currentUser } = useAuth();
   const isEdit = Boolean(id);
+  const scopedCompanyIdValue = currentUser?.company_id ?? currentUser?.company?.company_id ?? '';
+  const scopedCompanyId = scopedCompanyIdValue ? String(scopedCompanyIdValue) : '';
+  const scopedCompanyLabel =
+    currentUser?.company?.name ||
+    currentUser?.company_name ||
+    (scopedCompanyId ? `Company #${scopedCompanyId}` : '');
 
   useDocumentTitle(isEdit ? 'Edit User' : 'Add User');
 
@@ -148,7 +154,7 @@ const UserForm = () => {
     email: '',
     phone: '',
     type: USER_ROLES.USER,
-    company_id: '',
+    company_id: scopedCompanyId,
     is_active: true,
     password: '',
     password_confirmation: ''
@@ -176,6 +182,16 @@ const UserForm = () => {
   const fetchCompanies = useCallback(async () => {
     try {
       setLoadingCompanies(true);
+      if (scopedCompanyId) {
+        setCompanyOptions([
+          {
+            value: scopedCompanyId,
+            label: scopedCompanyLabel
+          }
+        ]);
+        return;
+      }
+
       const options = await companyService.getCompanyOptions();
       setCompanyOptions(options);
     } catch (err) {
@@ -183,7 +199,7 @@ const UserForm = () => {
     } finally {
       setLoadingCompanies(false);
     }
-  }, []);
+  }, [scopedCompanyId, scopedCompanyLabel]);
 
   const loadUser = useCallback(async () => {
     if (!isEdit || !id) return;
@@ -201,7 +217,7 @@ const UserForm = () => {
         (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
       const cleanedPhone = formatted.phone && formatted.phone !== '-' ? formatted.phone : '';
 
-      if (typeValue === USER_ROLES.USER && formatted.company_id) {
+      if (formatted.company_id) {
         setCompanyFallbackOption({
           value: String(formatted.company_id),
           label: formatted.company_name || `Company #${formatted.company_id}`
@@ -217,7 +233,7 @@ const UserForm = () => {
         email: formatted.email || '',
         phone: cleanedPhone || '',
         type: typeValue,
-        company_id: typeValue === USER_ROLES.USER && formatted.company_id ? String(formatted.company_id) : '',
+        company_id: formatted.company_id ? String(formatted.company_id) : scopedCompanyId,
         is_active: formatted.is_active,
         password: '',
         password_confirmation: ''
@@ -228,11 +244,31 @@ const UserForm = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, isEdit]);
+  }, [id, isEdit, scopedCompanyId]);
 
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
+
+  useEffect(() => {
+    if (!scopedCompanyId) return;
+
+    setCompanyFallbackOption({
+      value: scopedCompanyId,
+      label: scopedCompanyLabel
+    });
+
+    setFormData((prev) => {
+      if (prev.company_id === scopedCompanyId) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        company_id: scopedCompanyId
+      };
+    });
+  }, [scopedCompanyId, scopedCompanyLabel]);
 
   useEffect(() => {
     if (isEdit) {
@@ -241,6 +277,15 @@ const UserForm = () => {
   }, [isEdit, loadUser]);
 
   const companySelectOptions = useMemo(() => {
+    if (scopedCompanyId) {
+      return [
+        {
+          value: scopedCompanyId,
+          label: scopedCompanyLabel
+        }
+      ];
+    }
+
     const options = companyOptions.length ? companyOptions : [];
 
     if (companyFallbackOption) {
@@ -253,7 +298,7 @@ const UserForm = () => {
     }
 
     return options;
-  }, [companyFallbackOption, companyOptions]);
+  }, [companyFallbackOption, companyOptions, scopedCompanyId, scopedCompanyLabel]);
 
   const handleInputChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -269,6 +314,14 @@ const UserForm = () => {
         const first = name === 'firstname' ? nextValue : updated.firstname;
         const last = name === 'lastname' ? nextValue : updated.lastname;
         updated.name = `${first || ''} ${last || ''}`.trim();
+      }
+
+      if (name === 'type') {
+        if (scopedCompanyId) {
+          updated.company_id = scopedCompanyId;
+        } else if (nextValue === USER_ROLES.ADMIN) {
+          updated.company_id = '';
+        }
       }
 
       return updated;
@@ -337,6 +390,7 @@ const UserForm = () => {
 
       const payload = {
         ...formData,
+        company_id: scopedCompanyId || formData.company_id,
         name: `${formData.firstname || ''} ${formData.lastname || ''}`.trim()
       };
 
@@ -643,18 +697,22 @@ const UserForm = () => {
                     )}
                   </CCol>
 
-                  {formData.type === USER_ROLES.USER && (
+                  {(formData.type === USER_ROLES.USER || scopedCompanyId || formData.company_id) && (
                     <CCol md={6}>
-                      <CFormLabel htmlFor="company_id">Perusahaan</CFormLabel>
+                      <CFormLabel htmlFor="company_id">
+                        Perusahaan {(formData.type === USER_ROLES.USER || scopedCompanyId) && (
+                          <span className="text-danger">*</span>
+                        )}
+                      </CFormLabel>
                       <CFormSelect
                         id="company_id"
                         name="company_id"
                         value={formData.company_id}
                         onChange={handleInputChange}
-                        disabled={saving || loadingCompanies}
+                        disabled={saving || loadingCompanies || Boolean(scopedCompanyId)}
                         className={validationErrors.company_id ? 'is-invalid' : ''}
                       >
-                        <option value="">Pilih perusahaan</option>
+                        {!scopedCompanyId && <option value="">Pilih perusahaan</option>}
                         {companySelectOptions.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}

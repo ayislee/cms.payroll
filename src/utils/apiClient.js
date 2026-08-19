@@ -19,20 +19,10 @@ class ApiClient {
     return localStorage.getItem(config.auth.tokenStorageKey);
   }
 
-  // Get external API key
-  getExternalApiKey() {
-    return config.external.apiKey;
-  }
-
   // Set auth headers for internal APIs
   getAuthHeaders() {
     const token = this.getAuthToken();
     return token ? { 'Authorization': `Bearer ${token}` } : {};
-  }
-
-  // Set API key headers for external APIs
-  getExternalHeaders() {
-    return { 'X-API-Key': this.getExternalApiKey() };
   }
 
   // Generic request method
@@ -41,7 +31,6 @@ class ApiClient {
       method = 'GET',
       headers = {},
       body = null,
-      isExternal = false,
       timeout = this.timeout
     } = options;
 
@@ -58,12 +47,9 @@ class ApiClient {
       throw new Error('Invalid URL');
     }
 
-    // Determine which headers to use
-    const authHeaders = isExternal ? this.getExternalHeaders() : this.getAuthHeaders();
-    
     const requestHeaders = {
       ...this.defaultHeaders,
-      ...authHeaders,
+      ...this.getAuthHeaders(),
       ...headers
     };
 
@@ -218,12 +204,6 @@ class ApiClient {
       headers: uploadHeaders,
       body: formData
     });
-  }
-
-  // External API request (with API key)
-  async external(url, options = {}) {
-
-    return this.request(url, { ...options, isExternal: true });
   }
 }
 

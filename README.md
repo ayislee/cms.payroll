@@ -26,6 +26,7 @@ CoreUI is meant to be the UX game changer. Pure & transparent code is devoid of 
 * [CoreUI PRO](#coreui-pro)
 * [CoreUI PRO React Admin Templates](#coreui-pro-react-admin-templates)
 * [Quick Start](#quick-start)
+* [Environment & PM2](#environment--pm2)
 * [Installation](#installation)
 * [Basic usage](#basic-usage)
 * [What's included](#whats-included)
@@ -111,6 +112,37 @@ or
 # build for production with minification
 $ yarn build
 ```
+
+## Environment & PM2
+
+Copy `.env.example` to `.env`, then adjust the values as needed.
+
+```env
+VITE_APP_NAME=Payroll Management System
+VITE_APP_PORT=7000
+VITE_API_BASE_URL=http://localhost:7100/api/v1
+```
+
+`ecosystem.config.cjs` reads `.env` and serves the production build with PM2 static server:
+
+```bash
+npm run build
+pm2 start ecosystem.config.cjs
+```
+
+This is equivalent to:
+
+```bash
+pm2 serve build/ $VITE_APP_PORT --name "$VITE_APP_NAME" --spa
+```
+
+If `.env` is changed after PM2 is already running, restart with updated environment:
+
+```bash
+pm2 restart ecosystem.config.cjs --update-env
+```
+
+`VITE_*` values used by the frontend bundle, such as `VITE_API_BASE_URL`, are applied at build time, so run `npm run build` again after changing them.
 
 ## What's included
 

@@ -2,48 +2,43 @@
 // PAYROLL FRONTEND CONFIGURATION
 // ========================================
 
+const env = import.meta.env;
+
+const getEnv = (key, fallback) => env[key] ?? fallback;
+
+const getNumberEnv = (key, fallback) => {
+  const value = Number(env[key]);
+  return Number.isFinite(value) ? value : fallback;
+};
+
+const getBooleanEnv = (key, fallback) => {
+  if (env[key] === undefined) return fallback;
+  return env[key] === 'true';
+};
+
 const config = {
   // Application Configuration
   app: {
-    name: 'Payroll Management System',
-    version: '1.0.0',
-    port: 7000,
-    debug: false,
-    logLevel: 'info'
+    name: getEnv('VITE_APP_NAME', 'Payroll Management System'),
+    version: getEnv('VITE_APP_VERSION', '1.0.0'),
+    port: getNumberEnv('VITE_APP_PORT', 7000),
+    debug: getBooleanEnv('VITE_APP_DEBUG', false),
+    logLevel: getEnv('VITE_APP_LOG_LEVEL', 'info')
   },
 
   // API Configuration
   api: {
-    baseUrl: 'http://localhost:7100/api/v1',
-    timeout: 30000,
-    retryAttempts: 3,
-    retryDelay: 1000
+    baseUrl: getEnv('VITE_API_BASE_URL', 'http://localhost:7100/api/v1'),
+    timeout: getNumberEnv('VITE_API_TIMEOUT', 30000),
+    retryAttempts: getNumberEnv('VITE_API_RETRY_ATTEMPTS', 3),
+    retryDelay: getNumberEnv('VITE_API_RETRY_DELAY', 1000)
   },
 
   // Authentication Configuration
   auth: {
-    jwtSecretKey: 'your-jwt-secret-key-here',
-    tokenStorageKey: 'payroll_auth_token',
-    userStorageKey: 'payroll_user_data',
-    tokenExpiry: 24 * 60 * 60 * 1000, // 24 hours
-    refreshThreshold: 5 * 60 * 1000, // 5 minutes before expiry
-    enableRegistration: false
-  },
-
-  // External API Configuration
-  external: {
-    apiKey: 'hr_system_abc123def456',
-    hrSystemUrl: 'https://external-hr-system.example.com/api/v1',
-    enableSync: true
-  },
-
-  // Application Features
-  features: {
-    massPayroll: true,
-    attendanceSync: true,
-    bulkOperations: true,
-    advancedReports: true,
-    notifications: true
+    tokenStorageKey: getEnv('VITE_AUTH_TOKEN_STORAGE_KEY', 'payroll_auth_token_6f88ce5ae28abba7'),
+    userStorageKey: getEnv('VITE_AUTH_USER_STORAGE_KEY', 'payroll_user_data_c7a60d42f7507736'),
+    enableRegistration: getBooleanEnv('VITE_AUTH_ENABLE_REGISTRATION', false)
   },
 
   // Pagination Configuration

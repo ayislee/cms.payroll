@@ -62,11 +62,11 @@ import employeeService from '../../employees/services/employeeService';
 import companyService from '../../companies/services/companyService';
 import config from '../../../config/environment';
 
-const emptySearchParams = {
+const createDefaultSearchParams = () => ({
   search: '',
   payroll_periode: pickerValueToPayrollPeriod(getCurrentPayrollPickerValue()),
   company_id: ''
-};
+});
 
 const getDefaultPayrollPickerValue = () => getCurrentPayrollPickerValue();
 
@@ -117,8 +117,8 @@ const PayrollList = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [pageSize, setPageSize] = useState(15); // Default to 15 rows per page
-  const [searchParams, setSearchParams] = useState(emptySearchParams);
-  const [appliedSearchParams, setAppliedSearchParams] = useState(emptySearchParams);
+  const [searchParams, setSearchParams] = useState(() => createDefaultSearchParams());
+  const [appliedSearchParams, setAppliedSearchParams] = useState(() => createDefaultSearchParams());
   const [hasLoadedPayrolls, setHasLoadedPayrolls] = useState(false);
   const [periodOptions, setPeriodOptions] = useState([]);
   const [periodOptionsLoading, setPeriodOptionsLoading] = useState(false);
@@ -254,6 +254,10 @@ const PayrollList = () => {
   const isAllEligibleSelected =
     allEligiblePayrollIds.length > 0 &&
     allEligiblePayrollIds.every((payrollId) => selectedPayrollIds.includes(payrollId));
+  const currentPayrollPeriod = pickerValueToPayrollPeriod(getCurrentPayrollPickerValue());
+  const hasCurrentPeriodOption = periodOptions.some(
+    (option) => String(option.value) === String(currentPayrollPeriod)
+  );
 
   useDocumentTitle('Payroll List');
 
@@ -332,8 +336,9 @@ const PayrollList = () => {
   };
 
   const resetFilters = () => {
-    setSearchParams(emptySearchParams);
-    setAppliedSearchParams(emptySearchParams);
+    const defaultParams = createDefaultSearchParams();
+    setSearchParams(defaultParams);
+    setAppliedSearchParams(defaultParams);
     setCurrentPage(1);
   };
 
@@ -1262,6 +1267,11 @@ const PayrollList = () => {
                       disabled={periodOptionsLoading}
                     >
                       <option value="">All Periods</option>
+                      {currentPayrollPeriod && !hasCurrentPeriodOption && (
+                        <option value={currentPayrollPeriod}>
+                          {formatPayrollPeriod(currentPayrollPeriod)}
+                        </option>
+                      )}
                       {periodOptionsLoading ? (
                         <option disabled>Loading periods...</option>
                       ) : periodOptions.length === 0 ? (

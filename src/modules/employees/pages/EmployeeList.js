@@ -435,6 +435,7 @@ const EmployeeList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
+  const [actualTotalEmployees, setActualTotalEmployees] = useState(0);
   const [rows, setRows] = useState(config.pagination.defaultRows);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
@@ -475,6 +476,10 @@ const EmployeeList = () => {
 
     return selectedOption?.label || `Company #${selectedCompanyId}`;
   }, [companyOptions, selectedCompanyId]);
+
+  const actualTotalEmployeesCaption = selectedCompanyLabel
+    ? `In ${selectedCompanyLabel}`
+    : 'Across all companies';
 
   const uniqueCompanyCount = useMemo(() => {
     if (!employees.length) return 0;
@@ -608,6 +613,31 @@ const EmployeeList = () => {
   useEffect(() => {
     loadEmployees(1, '', true, config.pagination.defaultRows, '');
   }, [loadEmployees]);
+
+  const loadActualTotalEmployees = useCallback(async (companyId = '') => {
+    try {
+      const effectiveCompanyId = String(companyId || '').trim();
+      const params = {
+        page: 1,
+        rows: 1
+      };
+
+      if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
+
+      const response = await employeeService.getEmployees(params);
+
+      setActualTotalEmployees(response.total ?? 0);
+    } catch (error) {
+      console.error('Error loading actual employee total:', error);
+      setActualTotalEmployees(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadActualTotalEmployees(selectedCompanyId);
+  }, [loadActualTotalEmployees, selectedCompanyId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -822,7 +852,8 @@ const EmployeeList = () => {
 
   const handleRefresh = useCallback(() => {
     loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
-  }, [currentPage, loadEmployees, rows, searchTerm, selectedCompanyId]);
+    loadActualTotalEmployees(selectedCompanyId);
+  }, [currentPage, loadActualTotalEmployees, loadEmployees, rows, searchTerm, selectedCompanyId]);
 
   const handleDelete = useCallback((employee) => {
     setEmployeeToDelete(employee);
@@ -838,13 +869,14 @@ const EmployeeList = () => {
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
       loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
+      loadActualTotalEmployees(selectedCompanyId);
     } catch (error) {
       console.error('Error deleting employee:', error);
       setError(error.message || 'Failed to delete employee');
     } finally {
       setDeleting(false);
     }
-  }, [currentPage, employeeToDelete, loadEmployees, rows, searchTerm, selectedCompanyId]);
+  }, [currentPage, employeeToDelete, loadActualTotalEmployees, loadEmployees, rows, searchTerm, selectedCompanyId]);
 
   const handleOpenSyncModal = useCallback(() => {
     setShowSyncModal(true);
@@ -868,6 +900,7 @@ const EmployeeList = () => {
         'Sinkronisasi karyawan sedang diproses. Data akan diperbarui setelah backend menyelesaikan proses.'
       );
       loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
+      loadActualTotalEmployees(selectedCompanyId);
     } catch (syncError) {
       console.error('Error syncing employees:', syncError);
       setShowSyncModal(false);
@@ -876,7 +909,7 @@ const EmployeeList = () => {
     } finally {
       setSyncing(false);
     }
-  }, [currentPage, loadEmployees, rows, searchTerm, selectedCompanyId]);
+  }, [currentPage, loadActualTotalEmployees, loadEmployees, rows, searchTerm, selectedCompanyId]);
 
   const handleCreateEmployee = useCallback(() => {
     navigate('/employees/create');
@@ -990,8 +1023,8 @@ const EmployeeList = () => {
               <div className="d-flex justify-content-between align-items-start">
                 <div>
                   <div className="stat-card__label">Total Employees</div>
-                  <div className="stat-card__value">{totalEmployees}</div>
-                  <div className="stat-card__caption">Across all companies</div>
+                  <div className="stat-card__value">{actualTotalEmployees}</div>
+                  <div className="stat-card__caption">{actualTotalEmployeesCaption}</div>
                 </div>
                 <span className="stat-card__icon stat-card__icon--primary">
                   <CIcon icon={cilPeople} />

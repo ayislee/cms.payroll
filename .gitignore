@@ -10,7 +10,7 @@ yarn.lock
 
 # production
 /build
-/src/config/environment.js
+# /src/config/environment.js
 
 
 

@@ -20,11 +20,13 @@ class EmployeeService {
       
       const url = `${API_ENDPOINTS.EMPLOYEES.LIST}?${queryParams.toString()}`;
       const response = await apiClient.get(url);
-      const raw = response.data || {};
+      const raw = response || {};
+      const payload =
+        raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'data')
+          ? raw.data
+          : raw;
 
-      const topLevel = raw && typeof raw === 'object' && 'data' in raw ? raw.data : raw;
-
-      let pagination = topLevel;
+      let pagination = payload;
       if (pagination && typeof pagination === 'object') {
         if (Array.isArray(pagination.data)) {
           pagination = {
@@ -42,8 +44,8 @@ class EmployeeService {
 
       const employees = Array.isArray(pagination?.data)
         ? pagination.data
-        : Array.isArray(topLevel)
-        ? topLevel
+        : Array.isArray(payload)
+        ? payload
         : [];
 
       const totalSource = pagination?.total ?? pagination?.count ?? employees.length ?? 0;

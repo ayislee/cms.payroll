@@ -64,7 +64,7 @@ import config from '../../../config/environment';
 
 const emptySearchParams = {
   search: '',
-  payroll_periode: '',
+  payroll_periode: pickerValueToPayrollPeriod(getCurrentPayrollPickerValue()),
   company_id: ''
 };
 
@@ -521,7 +521,7 @@ const PayrollList = () => {
   const [downloadCompanies, setDownloadCompanies] = useState([]);
   const [showMassEmailModal, setShowMassEmailModal] = useState(false);
   const [massEmailCompanyId, setMassEmailCompanyId] = useState('');
-  const [massEmailPeriod, setMassEmailPeriod] = useState('');
+  const [massEmailPeriod, setMassEmailPeriod] = useState(() => getDefaultPayrollPickerValue());
   const [massEmailError, setMassEmailError] = useState('');
   const [massEmailSending, setMassEmailSending] = useState(false);
   const [massEmailConfirmPayload, setMassEmailConfirmPayload] = useState(null);
@@ -830,7 +830,7 @@ const PayrollList = () => {
   }, [searchParams.company_id]);
 
   const openMassEmailModal = () => {
-    setMassEmailPeriod('');
+    setMassEmailPeriod(getDefaultPayrollPickerValue());
     setMassEmailError('');
     if (downloadCompanies.length > 0) {
       setMassEmailCompanyId(String(downloadCompanies[0].value));
@@ -845,7 +845,7 @@ const PayrollList = () => {
       return;
     }
     setShowMassEmailModal(false);
-    setMassEmailPeriod('');
+    setMassEmailPeriod(getDefaultPayrollPickerValue());
     setMassEmailCompanyId('');
     setMassEmailError('');
     setMassEmailConfirmPayload(null);
@@ -860,7 +860,9 @@ const PayrollList = () => {
       return;
     }
 
-    if (!massEmailPeriod.trim()) {
+    const normalizedPayrollPeriod = pickerValueToPayrollPeriod(massEmailPeriod);
+
+    if (!normalizedPayrollPeriod) {
       setMassEmailError('Payroll period is required.');
       return;
     }
@@ -884,7 +886,7 @@ const PayrollList = () => {
     setMassEmailError('');
     setMassEmailConfirmPayload({
       companyId: companyIdNumeric,
-      period: massEmailPeriod.trim()
+      period: normalizedPayrollPeriod
     });
     setShowMassEmailModal(false);
   };
@@ -910,7 +912,7 @@ const PayrollList = () => {
       showToast('Mass slip emails sent successfully.', 'success');
       setMassEmailConfirmPayload(null);
       setShowMassEmailModal(false);
-      setMassEmailPeriod('');
+      setMassEmailPeriod(getDefaultPayrollPickerValue());
       setMassEmailCompanyId('');
       setMassEmailError('');
       await loadPayrolls();
@@ -1875,14 +1877,13 @@ const PayrollList = () => {
             <div className="mb-3">
               <label className="form-label">Payroll Period</label>
               <CFormInput
-                type="text"
-                placeholder="Enter period (e.g., 202501)"
+                type="month"
                 value={massEmailPeriod}
                 onChange={(e) => setMassEmailPeriod(e.target.value)}
                 disabled={massEmailSending}
               />
               <small className="text-muted">
-                Format: YYYYMM (e.g., 202501 for January 2025)
+                Select the payroll month for mass slip email.
               </small>
             </div>
 

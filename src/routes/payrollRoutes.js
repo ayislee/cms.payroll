@@ -23,6 +23,7 @@ const UserList = React.lazy(() => import('../modules/users/pages/UserList'));
 const UserDetail = React.lazy(() => import('../modules/users/pages/UserDetail'));
 const UserForm = React.lazy(() => import('../modules/users/pages/UserForm'));
 const UserCreate = React.lazy(() => import('../modules/users/pages/UserCreate'));
+const ProfilePage = React.lazy(() => import('../modules/profile/pages/ProfilePage'));
 
 // Component Management
 const ComponentList = React.lazy(() => import('../modules/components/pages/ComponentList'));
@@ -141,6 +142,11 @@ const payrollRoutes = [
     name: 'Edit User',
     element: UserForm,
     requiredPermissions: [PERMISSIONS.USERS_UPDATE]
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    element: ProfilePage
   },
 
   // Component Management Routes

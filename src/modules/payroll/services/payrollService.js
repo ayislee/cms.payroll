@@ -146,6 +146,25 @@ class PayrollService {
     }
   }
 
+  async massCheckPayrolls(payrollIds, password, companyId = '') {
+    try {
+      const payload = {
+        payroll_ids: payrollIds,
+        password
+      };
+
+      if (companyId) {
+        payload.company_id = companyId;
+      }
+
+      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.MASS_CHECK, payload);
+      return response.data || response;
+    } catch (error) {
+      console.error('Error running mass payroll check:', error);
+      throw this.handleError(error);
+    }
+  }
+
   // Generate mass slip for all employees
   async generateMassSlip(payrollPeriod) {
     try {

@@ -31,7 +31,13 @@ import {
 import { CChartLine, CChartBar } from '@coreui/react-chartjs';
 import { getStyle } from '@coreui/utils';
 import { useAuth } from '../../../hooks/useAuth';
-import { formatCurrency, formatPayrollPeriod } from '../../../utils/formatters';
+import {
+  formatCurrency,
+  formatPayrollPeriod,
+  getCurrentPayrollPeriod,
+  getCurrentPayrollPickerValue,
+  pickerValueToPayrollPeriod
+} from '../../../utils/formatters';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import apiClient from '../../../utils/apiClient';
 import { API_ENDPOINTS } from '../../../constants/apiEndpoints';
@@ -52,22 +58,33 @@ const formatPeriodLabel = (period, fallbackLabel) => {
 };
 
 const toLocaleNumber = (value) => Number(value || 0).toLocaleString('id-ID');
+const createDefaultActiveFilters = () => {
+  const currentPeriod = getCurrentPayrollPeriod();
+
+  return {
+    companyId: '',
+    periodStart: currentPeriod,
+    periodEnd: currentPeriod
+  };
+};
+
+const createDefaultFilterForm = () => {
+  const currentPickerValue = getCurrentPayrollPickerValue();
+
+  return {
+    companyId: '',
+    periodStart: currentPickerValue,
+    periodEnd: currentPickerValue
+  };
+};
 
 const Dashboard = () => {
   const { hasPermission } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [overview, setOverview] = useState(null);
-  const [activeFilters, setActiveFilters] = useState({
-    companyId: '',
-    periodStart: '',
-    periodEnd: ''
-  });
-  const [filterForm, setFilterForm] = useState({
-    companyId: '',
-    periodStart: '',
-    periodEnd: ''
-  });
+  const [activeFilters, setActiveFilters] = useState(() => createDefaultActiveFilters());
+  const [filterForm, setFilterForm] = useState(() => createDefaultFilterForm());
   const [companyOptions, setCompanyOptions] = useState([
     { value: '', label: 'Semua Perusahaan' }
   ]);
@@ -157,23 +174,24 @@ const Dashboard = () => {
 
   const handleFilterApply = (event) => {
     event.preventDefault();
-    const trimmedFilters = {
+    const nextFormValues = {
       companyId: filterForm.companyId.trim(),
       periodStart: filterForm.periodStart.trim(),
       periodEnd: filterForm.periodEnd.trim()
     };
-    setFilterForm(trimmedFilters);
-    setActiveFilters(trimmedFilters);
+    const nextActiveFilters = {
+      companyId: nextFormValues.companyId,
+      periodStart: pickerValueToPayrollPeriod(nextFormValues.periodStart),
+      periodEnd: pickerValueToPayrollPeriod(nextFormValues.periodEnd)
+    };
+
+    setFilterForm(nextFormValues);
+    setActiveFilters(nextActiveFilters);
   };
 
   const handleFilterReset = () => {
-    const emptyFilters = {
-      companyId: '',
-      periodStart: '',
-      periodEnd: ''
-    };
-    setFilterForm(emptyFilters);
-    setActiveFilters(emptyFilters);
+    setFilterForm(createDefaultFilterForm());
+    setActiveFilters(createDefaultActiveFilters());
   };
 
   const employeesMetrics = overview?.metrics?.employees || {
@@ -404,22 +422,20 @@ const Dashboard = () => {
                     </CFormSelect>
                   </CCol>
                   <CCol md={4}>
-                    <label className="form-label">Periode Mulai (YYYYMM)</label>
+                    <label className="form-label">Periode Mulai</label>
                     <CFormInput
+                      type="month"
                       value={filterForm.periodStart}
                       onChange={handleFilterInputChange('periodStart')}
-                      placeholder="Contoh: 202501"
-                      maxLength={6}
                       disabled={loading}
                     />
                   </CCol>
                   <CCol md={4}>
-                    <label className="form-label">Periode Akhir (YYYYMM)</label>
+                    <label className="form-label">Periode Akhir</label>
                     <CFormInput
+                      type="month"
                       value={filterForm.periodEnd}
                       onChange={handleFilterInputChange('periodEnd')}
-                      placeholder="Contoh: 202509"
-                      maxLength={6}
                       disabled={loading}
                     />
                   </CCol>

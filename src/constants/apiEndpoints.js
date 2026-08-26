@@ -13,7 +13,7 @@ export const API_ENDPOINTS = {
     REGISTER: `${API_BASE}/auth/register`,
     LOGOUT: `${API_BASE}/auth/logout`,
     PROFILE: `${API_BASE}/auth/profile`,
-    CHANGE_PASSWORD: `${API_BASE}/user/change-password`
+    CHANGE_PASSWORD: `${API_BASE}/auth/change-password`
   },
 
   // User Management Endpoints
@@ -91,6 +91,7 @@ export const API_ENDPOINTS = {
     GENERATE_SLIP: `${API_BASE}/payroll/slip`,
     MASS_GENERATE: `${API_BASE}/payroll/generate-mass`,
     MASS_GENERATE_SLIP: `${API_BASE}/payroll/slip/mass`,
+    MASS_CHECK: `${API_BASE}/payroll/check-mass`,
     EMAIL_SLIP: `${API_BASE}/payroll/slip/email`,
     EMAIL_SLIP_MASS: `${API_BASE}/payroll/slip/email/mass`,
     PERIOD_OPTIONS: `${API_BASE}/payroll/period-options`,

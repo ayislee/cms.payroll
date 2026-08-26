@@ -13,8 +13,25 @@ import {
 import { cilSettings, cilUser, cilExitToApp } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
 
-import avatar8 from './../../assets/images/avatars/8.jpg'
 import { useAuth } from '../../hooks/useAuth'
+
+const getUserInitials = (user) => {
+  const fullName = [user?.firstname, user?.lastname]
+    .filter(Boolean)
+    .join(' ')
+    .trim() || user?.name || user?.email || 'U'
+
+  const parts = fullName
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+  }
+
+  const single = parts[0] || 'U'
+  return single.slice(0, 2).toUpperCase()
+}
 
 const AppHeaderDropdown = () => {
   const { user, logout, loading } = useAuth()
@@ -37,11 +54,14 @@ const AppHeaderDropdown = () => {
   const displayName =
     user?.name || [user?.firstname, user?.lastname].filter(Boolean).join(' ') || 'Pengguna'
   const userEmail = user?.email || '-'
+  const userInitials = getUserInitials(user)
 
   return (
     <CDropdown variant="nav-item">
       <CDropdownToggle placement="bottom-end" className="py-0 pe-0" caret={false}>
-        <CAvatar src={avatar8} size="md" />
+        <CAvatar color="primary" textColor="white" size="md">
+          {userInitials}
+        </CAvatar>
       </CDropdownToggle>
       <CDropdownMenu className="pt-0" placement="bottom-end">
         <CDropdownHeader className="bg-body-secondary fw-semibold mb-2 text-center">

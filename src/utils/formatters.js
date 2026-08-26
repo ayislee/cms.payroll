@@ -253,6 +253,37 @@ export const getCurrentPayrollPeriod = () => {
   return `${year}${month}`;
 };
 
+// Convert payroll period (YYYYMM) to month picker value (YYYY-MM)
+export const payrollPeriodToPickerValue = (period) => {
+  const normalized = String(period || '').trim();
+
+  if (!/^\d{6}$/.test(normalized)) {
+    return '';
+  }
+
+  return `${normalized.slice(0, 4)}-${normalized.slice(4, 6)}`;
+};
+
+// Convert month picker value (YYYY-MM) to payroll period (YYYYMM)
+export const pickerValueToPayrollPeriod = (value) => {
+  const normalized = String(value || '').trim();
+
+  if (/^\d{6}$/.test(normalized)) {
+    return normalized;
+  }
+
+  if (!/^\d{4}-\d{2}$/.test(normalized)) {
+    return '';
+  }
+
+  return normalized.replace('-', '');
+};
+
+// Get current month picker value from current payroll period
+export const getCurrentPayrollPickerValue = () => {
+  return payrollPeriodToPickerValue(getCurrentPayrollPeriod());
+};
+
 // Format validation errors
 export const formatValidationErrors = (errors) => {
   if (Array.isArray(errors)) {
@@ -281,5 +312,8 @@ export default {
   getStatusBadgeVariant,
   parsePayrollPeriod,
   getCurrentPayrollPeriod,
+  payrollPeriodToPickerValue,
+  pickerValueToPayrollPeriod,
+  getCurrentPayrollPickerValue,
   formatValidationErrors
 };

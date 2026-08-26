@@ -23,6 +23,7 @@ import {
   CPaginationItem,
   CBadge,
   CForm,
+  CFormCheck,
   CFormInput,
   CFormSelect,
   CInputGroup,
@@ -45,13 +46,17 @@ import {
   cilSearch,
   cilCloudDownload,
   cilViewModule,
-  cilLoopCircular,
   cilEnvelopeClosed,
   cilCheckCircle,
   cilWarning
 } from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
-import { formatPayrollPeriod } from '../../../utils/formatters';
+import {
+  formatPayrollPeriod,
+  getCurrentPayrollPickerValue,
+  pickerValueToPayrollPeriod,
+  payrollPeriodToPickerValue
+} from '../../../utils/formatters';
 import payrollService from '../services/payrollService';
 import employeeService from '../../employees/services/employeeService';
 import companyService from '../../companies/services/companyService';
@@ -62,6 +67,8 @@ const emptySearchParams = {
   payroll_periode: '',
   company_id: ''
 };
+
+const getDefaultPayrollPickerValue = () => getCurrentPayrollPickerValue();
 
 // Error Boundary Component
 class PayrollListErrorBoundary extends React.Component {
@@ -120,22 +127,22 @@ const PayrollList = () => {
   // Generate Payroll Modal State
   const [showGeneratePayrollModal, setShowGeneratePayrollModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [payrollPeriod, setPayrollPeriod] = useState('');
+  const [payrollPeriod, setPayrollPeriod] = useState(() => getDefaultPayrollPickerValue());
   const [generatingPayroll, setGeneratingPayroll] = useState(false);
   const [payrollError, setPayrollError] = useState('');
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [employeeSearchResults, setEmployeeSearchResults] = useState([]);
   const [searchingEmployees, setSearchingEmployees] = useState(false);
-  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
-  const [regenerateTarget, setRegenerateTarget] = useState(null);
-  const [regeneratePeriod, setRegeneratePeriod] = useState('');
-  const [regenerateError, setRegenerateError] = useState('');
-  const [regenerating, setRegenerating] = useState(false);
   const [showRowPayrollModal, setShowRowPayrollModal] = useState(false);
   const [rowPayrollTarget, setRowPayrollTarget] = useState(null);
-  const [rowPayrollPeriod, setRowPayrollPeriod] = useState('');
+  const [rowPayrollPeriod, setRowPayrollPeriod] = useState(() => getDefaultPayrollPickerValue());
   const [rowPayrollError, setRowPayrollError] = useState('');
   const [rowGeneratingPayroll, setRowGeneratingPayroll] = useState(false);
+  const [showMassCheckModal, setShowMassCheckModal] = useState(false);
+  const [massCheckPassword, setMassCheckPassword] = useState('');
+  const [massCheckError, setMassCheckError] = useState('');
+  const [massChecking, setMassChecking] = useState(false);
+  const [selectedPayrollIds, setSelectedPayrollIds] = useState([]);
   
   // Toast Notification State
   const [toast, setToast] = useState({
@@ -237,7 +244,29 @@ const PayrollList = () => {
     return '';
   };
 
+  const canReopenPayroll = (payroll) => Boolean(payroll?.is_printed) && !Boolean(payroll?.is_emailed);
+  const canCheckPayroll = (payroll) => Boolean(payroll?.slip_url) && !Boolean(payroll?.is_printed);
+  const canSelectPayrollForMassCheck = (payroll) => canCheckPayroll(payroll) && !Boolean(payroll?.is_emailed);
+  const selectedEligiblePayrolls = payrolls.filter((payroll) => selectedPayrollIds.includes(payroll.payroll_id));
+  const allEligiblePayrollIds = payrolls
+    .filter((payroll) => canSelectPayrollForMassCheck(payroll))
+    .map((payroll) => payroll.payroll_id);
+  const isAllEligibleSelected =
+    allEligiblePayrollIds.length > 0 &&
+    allEligiblePayrollIds.every((payrollId) => selectedPayrollIds.includes(payrollId));
+
   useDocumentTitle('Payroll List');
+
+  useEffect(() => {
+    setSelectedPayrollIds((previous) =>
+      previous.filter((payrollId) =>
+        payrolls.some(
+          (payroll) =>
+            payroll.payroll_id === payrollId && canSelectPayrollForMassCheck(payroll)
+        )
+      )
+    );
+  }, [payrolls]);
 
   const loadPayrolls = async () => {
     try {
@@ -311,7 +340,7 @@ const PayrollList = () => {
   // Handle Generate Payroll
   const handleGeneratePayroll = () => {
     setSelectedEmployee(null);
-    setPayrollPeriod('');
+    setPayrollPeriod(getDefaultPayrollPickerValue());
     setPayrollError('');
     setEmployeeSearchTerm('');
     setEmployeeSearchResults([]);
@@ -384,23 +413,12 @@ const PayrollList = () => {
     setEmployeeSearchResults([]);
   };
 
-  const openRegenerateModal = (payroll) => {
-    setRegenerateTarget(payroll);
-    setRegeneratePeriod(String(payroll.payroll_periode || '').trim());
-    setRegenerateError('');
-    setShowRegenerateModal(true);
-  };
-
-  const closeRegenerateModal = () => {
-    setShowRegenerateModal(false);
-    setRegenerateTarget(null);
-    setRegeneratePeriod('');
-    setRegenerateError('');
-  };
-
   const openRowPayrollModal = (payroll) => {
     setRowPayrollTarget(payroll);
-    setRowPayrollPeriod(String(payroll.payroll_periode || '').trim());
+    setRowPayrollPeriod(
+      payrollPeriodToPickerValue(String(payroll.payroll_periode || '').trim()) ||
+        getDefaultPayrollPickerValue()
+    );
     setRowPayrollError('');
     setShowRowPayrollModal(true);
   };
@@ -408,21 +426,23 @@ const PayrollList = () => {
   const closeRowPayrollModal = () => {
     setShowRowPayrollModal(false);
     setRowPayrollTarget(null);
-    setRowPayrollPeriod('');
+    setRowPayrollPeriod(getDefaultPayrollPickerValue());
     setRowPayrollError('');
   };
 
   // Generate payroll
-const generatePayroll = async (e) => {
+  const generatePayroll = async (e) => {
     e.preventDefault();
     
     if (!selectedEmployee) {
       setPayrollError('Please select an employee');
       return;
     }
-    
-    if (!payrollPeriod.trim()) {
-      setPayrollError('Please enter a payroll period');
+
+    const normalizedPayrollPeriod = pickerValueToPayrollPeriod(payrollPeriod);
+
+    if (!normalizedPayrollPeriod) {
+      setPayrollError('Please select a payroll period');
       return;
     }
 
@@ -430,74 +450,24 @@ const generatePayroll = async (e) => {
       setGeneratingPayroll(true);
       setPayrollError('');
       
-      // Call the payroll service to generate the payroll
-     await payrollService.generatePayroll(
-       selectedEmployee.employee_id,
-       payrollPeriod,
-       selectedEmployee.company_id || selectedEmployee.company?.company_id || ''
-     );
-     
-     // Close modal
-     setShowGeneratePayrollModal(false);
-     setSelectedEmployee(null);
-     setPayrollPeriod('');
-     
-     // Show success toast
-     showToast('Payroll generated successfully', 'success');
-     
-     // Refresh the payroll list
-     await loadPayrolls();
-     
+      const response = await payrollService.generatePayroll(
+        selectedEmployee.employee_id,
+        normalizedPayrollPeriod,
+        selectedEmployee.company_id || selectedEmployee.company?.company_id || ''
+      );
+
+      setShowGeneratePayrollModal(false);
+      setSelectedEmployee(null);
+      setPayrollPeriod(getDefaultPayrollPickerValue());
+
+      showToast(response?.message || 'Payroll generated successfully. Slip generated automatically.', 'success');
+      await loadPayrolls();
     } catch (error) {
       console.error('Error generating payroll:', error);
       setPayrollError(error.message || 'Failed to generate payroll');
-      // Show error toast
       showToast(error.message || 'Failed to generate payroll', 'danger');
     } finally {
       setGeneratingPayroll(false);
-    }
-  };
-
-  const handleGenerateSlip = async () => {
-    if (!regenerateTarget || !regenerateTarget.employee_id) {
-      setRegenerateError('Invalid payroll selected.');
-      return;
-    }
-
-    if (!regeneratePeriod.trim()) {
-      setRegenerateError('Payroll period is required.');
-      return;
-    }
-
-    try {
-      setRegenerating(true);
-      setRegenerateError('');
-
-      const response = await payrollService.generateSlip(
-        regenerateTarget.employee_id,
-        regeneratePeriod.trim(),
-        getPayrollCompanyId(regenerateTarget)
-      );
-
-      const slipUrl =
-        response?.data?.payroll?.slip_url ||
-        response?.payroll?.slip_url ||
-        null;
-
-      showToast(
-        slipUrl
-          ? 'Slip generated successfully. Download icon updated.'
-          : 'Slip generated successfully.',
-        'success'
-      );
-
-      closeRegenerateModal();
-      await loadPayrolls();
-    } catch (error) {
-      console.error('Error generating slip:', error);
-      setRegenerateError(error.message || 'Failed to generate slip.');
-    } finally {
-      setRegenerating(false);
     }
   };
 
@@ -507,7 +477,9 @@ const generatePayroll = async (e) => {
       return;
     }
 
-    if (!rowPayrollPeriod.trim()) {
+    const normalizedPayrollPeriod = pickerValueToPayrollPeriod(rowPayrollPeriod);
+
+    if (!normalizedPayrollPeriod) {
       setRowPayrollError('Payroll period is required.');
       return;
     }
@@ -518,19 +490,12 @@ const generatePayroll = async (e) => {
 
       const response = await payrollService.generatePayroll(
         rowPayrollTarget.employee_id,
-        rowPayrollPeriod.trim(),
+        normalizedPayrollPeriod,
         getPayrollCompanyId(rowPayrollTarget)
       );
 
-      const slipUrl =
-        response?.data?.payroll?.slip_url ||
-        response?.payroll?.slip_url ||
-        null;
-
       showToast(
-        slipUrl
-          ? 'Payroll generated successfully. Download icon updated.'
-          : 'Payroll generated successfully.',
+        response?.message || 'Payroll generated successfully. Slip generated automatically.',
         'success'
       );
 
@@ -545,15 +510,11 @@ const generatePayroll = async (e) => {
   };
 
   const [showMassGenerateModal, setShowMassGenerateModal] = useState(false);
-  const [massPayrollPeriod, setMassPayrollPeriod] = useState('');
+  const [massPayrollPeriod, setMassPayrollPeriod] = useState(() => getDefaultPayrollPickerValue());
   const [massGenerateError, setMassGenerateError] = useState('');
   const [massGenerating, setMassGenerating] = useState(false);
-  const [showMassSlipModal, setShowMassSlipModal] = useState(false);
-  const [massSlipPeriod, setMassSlipPeriod] = useState('');
-  const [massSlipError, setMassSlipError] = useState('');
-  const [massSlipGenerating, setMassSlipGenerating] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [downloadPeriod, setDownloadPeriod] = useState('');
+  const [downloadPeriod, setDownloadPeriod] = useState(() => getDefaultPayrollPickerValue());
   const [downloadCompanyId, setDownloadCompanyId] = useState('');
   const [downloadError, setDownloadError] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -569,31 +530,21 @@ const generatePayroll = async (e) => {
   const [checkingPayrollId, setCheckingPayrollId] = useState(null);
 
   const openMassGenerateModal = () => {
-    setMassPayrollPeriod('');
+    setMassPayrollPeriod(getDefaultPayrollPickerValue());
     setMassGenerateError('');
     setShowMassGenerateModal(true);
   };
 
   const closeMassGenerateModal = () => {
     setShowMassGenerateModal(false);
-    setMassPayrollPeriod('');
+    setMassPayrollPeriod(getDefaultPayrollPickerValue());
     setMassGenerateError('');
   };
 
-  const openMassSlipModal = () => {
-    setMassSlipPeriod('');
-    setMassSlipError('');
-    setShowMassSlipModal(true);
-  };
-
-  const closeMassSlipModal = () => {
-    setShowMassSlipModal(false);
-    setMassSlipPeriod('');
-    setMassSlipError('');
-  };
-
   const handleMassPayrollGenerate = async () => {
-    if (!massPayrollPeriod.trim()) {
+    const normalizedPayrollPeriod = pickerValueToPayrollPeriod(massPayrollPeriod);
+
+    if (!normalizedPayrollPeriod) {
       setMassGenerateError('Payroll period is required.');
       return;
     }
@@ -602,7 +553,7 @@ const generatePayroll = async (e) => {
       setMassGenerating(true);
       setMassGenerateError('');
 
-      const result = await payrollService.generateMassPayroll(massPayrollPeriod.trim());
+      const result = await payrollService.generateMassPayroll(normalizedPayrollPeriod);
 
       showToast(result?.message || 'Mass payroll generation completed.', 'success');
       closeMassGenerateModal();
@@ -615,8 +566,83 @@ const generatePayroll = async (e) => {
     }
   };
 
+  const handlePayrollSelectionToggle = (payrollId) => {
+    setSelectedPayrollIds((previous) => (
+      previous.includes(payrollId)
+        ? previous.filter((id) => id !== payrollId)
+        : [...previous, payrollId]
+    ));
+  };
+
+  const handleSelectAllEligiblePayrolls = () => {
+    setSelectedPayrollIds((previous) => {
+      if (isAllEligibleSelected) {
+        return previous.filter((id) => !allEligiblePayrollIds.includes(id));
+      }
+
+      const mergedIds = new Set([...previous, ...allEligiblePayrollIds]);
+      return Array.from(mergedIds);
+    });
+  };
+
+  const openMassCheckModal = () => {
+    if (selectedEligiblePayrolls.length === 0) {
+      showToast('Select at least one eligible payroll to check.', 'warning');
+      return;
+    }
+
+    setMassCheckPassword('');
+    setMassCheckError('');
+    setShowMassCheckModal(true);
+  };
+
+  const closeMassCheckModal = () => {
+    if (massChecking) {
+      return;
+    }
+
+    setShowMassCheckModal(false);
+    setMassCheckPassword('');
+    setMassCheckError('');
+  };
+
+  const handleMassCheckPayrolls = async () => {
+    if (selectedEligiblePayrolls.length === 0) {
+      setMassCheckError('Select at least one eligible payroll.');
+      return;
+    }
+
+    if (!massCheckPassword.trim()) {
+      setMassCheckError('Password confirmation is required.');
+      return;
+    }
+
+    try {
+      setMassChecking(true);
+      setMassCheckError('');
+
+      const response = await payrollService.massCheckPayrolls(
+        selectedEligiblePayrolls.map((payroll) => payroll.payroll_id),
+        massCheckPassword.trim(),
+        appliedSearchParams.company_id || ''
+      );
+
+      showToast(response?.message || 'Mass payroll check completed.', 'success');
+      setSelectedPayrollIds([]);
+      setShowMassCheckModal(false);
+      setMassCheckPassword('');
+      setMassCheckError('');
+      await loadPayrolls();
+    } catch (error) {
+      console.error('Error checking payrolls in bulk:', error);
+      setMassCheckError(error.message || 'Failed to run mass payroll check.');
+    } finally {
+      setMassChecking(false);
+    }
+  };
+
   const openDownloadModal = () => {
-    setDownloadPeriod("");
+    setDownloadPeriod(getDefaultPayrollPickerValue());
     setDownloadError("");
     setShowDownloadModal(true);
 
@@ -629,7 +655,7 @@ const generatePayroll = async (e) => {
 
   const closeDownloadModal = () => {
     setShowDownloadModal(false);
-    setDownloadPeriod("");
+    setDownloadPeriod(getDefaultPayrollPickerValue());
     setDownloadCompanyId("");
     setDownloadError("");
   };
@@ -691,7 +717,9 @@ const generatePayroll = async (e) => {
   };
 
   const handlePayrollDownload = async () => {
-    if (!downloadPeriod.trim()) {
+    const normalizedPayrollPeriod = pickerValueToPayrollPeriod(downloadPeriod);
+
+    if (!normalizedPayrollPeriod) {
       setDownloadError("Payroll period is required.");
       return;
     }
@@ -712,7 +740,7 @@ const generatePayroll = async (e) => {
       setDownloadError("");
 
       const responseData = await payrollService.downloadPayroll(
-        downloadPeriod.trim(),
+        normalizedPayrollPeriod,
         companyIdNumeric
       );
 
@@ -720,7 +748,7 @@ const generatePayroll = async (e) => {
       const downloadUrl = payload?.download_url || null;
       const fallbackName =
         payload?.file_name ||
-        `payroll-${downloadPeriod.trim()}.xlsx`;
+        `payroll-${normalizedPayrollPeriod}.xlsx`;
 
       if (!downloadUrl) {
         showToast("Payroll file generation triggered.", "success");
@@ -800,29 +828,6 @@ const generatePayroll = async (e) => {
       isMounted = false;
     };
   }, [searchParams.company_id]);
-
-  const handleMassSlipGenerate = async () => {
-    if (!massSlipPeriod.trim()) {
-      setMassSlipError('Payroll period is required.');
-      return;
-    }
-
-    try {
-      setMassSlipGenerating(true);
-      setMassSlipError('');
-
-      await payrollService.generateMassSlip(massSlipPeriod.trim());
-
-      showToast('Mass slip generation started successfully.', 'success');
-      closeMassSlipModal();
-      await loadPayrolls();
-    } catch (error) {
-      console.error('Error generating mass slip:', error);
-      setMassSlipError(error.message || 'Failed to generate mass slip.');
-    } finally {
-      setMassSlipGenerating(false);
-    }
-  };
 
   const openMassEmailModal = () => {
     setMassEmailPeriod('');
@@ -968,6 +973,11 @@ const generatePayroll = async (e) => {
 
     const nextChecked = !Boolean(payroll.is_printed);
 
+    if (payroll.is_printed && payroll.is_emailed) {
+      showToast('Emailed payroll cannot be reopened.', 'warning');
+      return;
+    }
+
     try {
       setCheckingPayrollId(payroll.payroll_id);
       const response = await payrollService.updatePayroll(payroll.payroll_id, {
@@ -981,19 +991,14 @@ const generatePayroll = async (e) => {
           ? {
               ...item,
               ...(updatedPayroll || {}),
-              is_printed: nextChecked,
-              ...(!nextChecked ? {
-                slip_url: null,
-                is_emailed: false,
-                is_posted: false
-              } : {})
+              is_printed: nextChecked
             }
           : item
       )));
 
       showToast(
         nextChecked
-          ? 'Payroll marked as checked and locked for regeneration.'
+          ? 'Payroll marked as checked.'
           : 'Payroll reopened for correction.',
         'success'
       );
@@ -1115,10 +1120,11 @@ const generatePayroll = async (e) => {
                   </CButton>
                   <CButton
                     color="success"
-                    onClick={openMassSlipModal}
+                    onClick={openMassCheckModal}
+                    disabled={selectedEligiblePayrolls.length === 0}
                   >
-                    <CIcon icon={cilPlus} className="me-1" />
-                    Generate Mass Slip
+                    <CIcon icon={cilCheckCircle} className="me-1" />
+                    Check Selected ({selectedEligiblePayrolls.length})
                   </CButton>
                   <CButton
                     color="warning"
@@ -1289,6 +1295,13 @@ const generatePayroll = async (e) => {
                   <CTable responsive hover>
                     <CTableHead>
                       <CTableRow>
+                        <CTableHeaderCell className="text-center">
+                          <CFormCheck
+                            checked={isAllEligibleSelected}
+                            disabled={allEligiblePayrollIds.length === 0}
+                            onChange={handleSelectAllEligiblePayrolls}
+                          />
+                        </CTableHeaderCell>
                         <CTableHeaderCell>Employee</CTableHeaderCell>
                         <CTableHeaderCell>Company</CTableHeaderCell>
                         <CTableHeaderCell>Period</CTableHeaderCell>
@@ -1302,9 +1315,17 @@ const generatePayroll = async (e) => {
                         const periodInfo = resolvePeriodLabel(payroll.payroll_periode);
                         const companyLabel = getCompanyLabel(payroll);
                         const hasSlipFile = Boolean(payroll.slip_url);
+                        const canSelectForMassCheck = canSelectPayrollForMassCheck(payroll);
 
                         return (
                           <CTableRow key={payroll.payroll_id}>
+                            <CTableDataCell className="text-center">
+                              <CFormCheck
+                                checked={selectedPayrollIds.includes(payroll.payroll_id)}
+                                disabled={!canSelectForMassCheck}
+                                onChange={() => handlePayrollSelectionToggle(payroll.payroll_id)}
+                              />
+                            </CTableDataCell>
                             <CTableDataCell>
                               <div className="fw-semibold">{payroll.employee?.name || 'N/A'}</div>
                               <div className="small text-medium-emphasis">
@@ -1369,14 +1390,6 @@ const generatePayroll = async (e) => {
                                 >
                                   <CIcon icon={cilMoney} size="sm" />
                                 </CButton>
-                                <CButton
-                                  color="primary"
-                                  size="sm"
-                                  title="Generate slip"
-                                  onClick={() => openRegenerateModal(payroll)}
-                                >
-                                  <CIcon icon={cilLoopCircular} size="sm" />
-                                </CButton>
                                 {hasSlipFile ? (
                                   <CButton
                                     color="primary"
@@ -1404,21 +1417,24 @@ const generatePayroll = async (e) => {
                                   size="sm"
                                   title={
                                     payroll.is_printed
-                                      ? 'Reopen payroll for correction'
+                                      ? (payroll.is_emailed
+                                        ? 'Emailed payroll cannot be reopened'
+                                        : 'Reopen payroll for correction')
                                       : hasSlipFile
                                         ? 'Mark payroll as checked'
-                                        : 'Generate slip before checking payroll'
+                                        : 'Payroll slip is not available'
                                   }
                                   disabled={
                                     checkingPayrollId === payroll.payroll_id ||
-                                    (!payroll.is_printed && !hasSlipFile)
+                                    (!payroll.is_printed && !canCheckPayroll(payroll)) ||
+                                    (payroll.is_printed && !canReopenPayroll(payroll))
                                   }
                                   onClick={() => handleManualCheckPayroll(payroll)}
                                 >
                                   {checkingPayrollId === payroll.payroll_id ? (
                                     <CSpinner size="sm" />
                                   ) : payroll.is_printed ? (
-                                    <CIcon icon={cilLoopCircular} size="sm" />
+                                    <CIcon icon={cilMoney} size="sm" />
                                   ) : (
                                     <CIcon icon={cilCheckCircle} size="sm" />
                                   )}
@@ -1630,14 +1646,13 @@ const generatePayroll = async (e) => {
           <div className="mb-3">
             <label className="form-label">Payroll Period</label>
             <CFormInput
-              type="text"
-              placeholder="Enter period (e.g., 202501)"
+              type="month"
               value={payrollPeriod}
               onChange={(e) => setPayrollPeriod(e.target.value)}
               disabled={generatingPayroll}
               required
             />
-            <small className="text-muted">Format: YYYYMM (e.g., 202501 for January 2025)</small>
+            <small className="text-muted">Select the payroll month to generate.</small>
           </div>
         </CModalBody>
         <CModalFooter>
@@ -1697,14 +1712,13 @@ const generatePayroll = async (e) => {
           <div className="mb-3">
             <label className="form-label">Payroll Period</label>
             <CFormInput
-              type="text"
-              placeholder="Enter period (e.g., 202501)"
+              type="month"
               value={rowPayrollPeriod}
               onChange={(e) => setRowPayrollPeriod(e.target.value)}
               disabled={rowGeneratingPayroll}
             />
             <small className="text-muted">
-              Format: YYYYMM (e.g., 202501 for January 2025)
+              Select the payroll month to generate.
             </small>
             <small className="text-muted d-block mt-1">
               Only employees with net pay greater than 0 will be generated. Employees with zero or negative net pay are skipped.
@@ -1754,14 +1768,13 @@ const generatePayroll = async (e) => {
           <div className="mb-3">
             <label className="form-label">Payroll Period</label>
             <CFormInput
-              type="text"
-              placeholder="Enter period (e.g., 202501)"
+              type="month"
               value={massPayrollPeriod}
               onChange={(e) => setMassPayrollPeriod(e.target.value)}
               disabled={massGenerating}
             />
             <small className="text-muted">
-              Format: YYYYMM (e.g., 202501 for January 2025)
+              Select the payroll month for mass generation.
             </small>
           </div>
         </CModalBody>
@@ -1789,56 +1802,55 @@ const generatePayroll = async (e) => {
           </CButton>
         </CModalFooter>
       </CModal>
-      
-      {/* Generate Mass Slip Modal */}
+
       <CModal
-        visible={showMassSlipModal}
-        onClose={closeMassSlipModal}
+        visible={showMassCheckModal}
+        onClose={closeMassCheckModal}
       >
         <CModalHeader>
-          <CModalTitle>Generate Mass Slip</CModalTitle>
+          <CModalTitle>Check Selected Payrolls</CModalTitle>
         </CModalHeader>
         <CModalBody>
-          {massSlipError && (
+          {massCheckError && (
             <CAlert color="danger" className="mb-3">
-              {massSlipError}
+              {massCheckError}
             </CAlert>
           )}
 
+          <p className="mb-3">
+            {selectedEligiblePayrolls.length} payroll akan ditandai checked. Masukkan password akun Anda untuk konfirmasi.
+          </p>
+
           <div className="mb-3">
-            <label className="form-label">Payroll Period</label>
+            <label className="form-label">Password</label>
             <CFormInput
-              type="text"
-              placeholder="Enter period (e.g., 202501)"
-              value={massSlipPeriod}
-              onChange={(e) => setMassSlipPeriod(e.target.value)}
-              disabled={massSlipGenerating}
+              type="password"
+              value={massCheckPassword}
+              onChange={(e) => setMassCheckPassword(e.target.value)}
+              disabled={massChecking}
             />
-            <small className="text-muted">
-              Format: YYYYMM (e.g., 202501 for January 2025)
-            </small>
           </div>
         </CModalBody>
         <CModalFooter>
           <CButton
             color="secondary"
-            onClick={closeMassSlipModal}
-            disabled={massSlipGenerating}
+            onClick={closeMassCheckModal}
+            disabled={massChecking}
           >
             Cancel
           </CButton>
           <CButton
-            color="primary"
-            onClick={handleMassSlipGenerate}
-            disabled={massSlipGenerating}
+            color="success"
+            onClick={handleMassCheckPayrolls}
+            disabled={massChecking || !massCheckPassword.trim() || selectedEligiblePayrolls.length === 0}
           >
-            {massSlipGenerating ? (
+            {massChecking ? (
               <>
                 <CSpinner size="sm" className="me-2" />
-                Generating...
+                Checking...
               </>
             ) : (
-              'Generate Slip'
+              'Confirm Check'
             )}
           </CButton>
         </CModalFooter>
@@ -1959,74 +1971,6 @@ const generatePayroll = async (e) => {
           </CButton>
         </CModalFooter>
       </CModal>
-      
-      {/* Generate Slip Modal */}{/* Generate Slip Modal */}
-      <CModal
-        visible={showRegenerateModal}
-        onClose={closeRegenerateModal}
-      >
-        <CModalHeader>
-          <CModalTitle>Generate Slip</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          {regenerateError && (
-            <CAlert color="danger" className="mb-3">
-              {regenerateError}
-            </CAlert>
-          )}
-
-          <div className="mb-3">
-            <label className="form-label">Employee</label>
-            <CFormInput
-              type="text"
-              value={
-                regenerateTarget
-                  ? `${regenerateTarget.employee?.name || '-'} (${regenerateTarget.employee?.nik || '-'})`
-                  : ''
-              }
-              disabled
-              readOnly
-            />
-          </div>
-
-          <div className="mb-3">
-            <label className="form-label">Payroll Period</label>
-            <CFormInput
-              type="text"
-              placeholder="Enter period (e.g., 202501)"
-              value={regeneratePeriod}
-              onChange={(e) => setRegeneratePeriod(e.target.value)}
-              disabled={regenerating}
-            />
-            <small className="text-muted">
-              Format: YYYYMM (e.g., 202501 for January 2025)
-            </small>
-          </div>
-        </CModalBody>
-        <CModalFooter>
-          <CButton
-            color="secondary"
-            onClick={closeRegenerateModal}
-            disabled={regenerating}
-          >
-            Cancel
-          </CButton>
-          <CButton
-            color="primary"
-            onClick={handleGenerateSlip}
-            disabled={regenerating}
-          >
-            {regenerating ? (
-              <>
-                <CSpinner size="sm" className="me-2" />
-                Generating...
-              </>
-            ) : (
-              'Generate Slip'
-            )}
-          </CButton>
-        </CModalFooter>
-      </CModal>
       {/* Download Payroll Modal */}
       <CModal
         visible={showDownloadModal}
@@ -2045,14 +1989,13 @@ const generatePayroll = async (e) => {
           <div className="mb-3">
             <label className="form-label">Payroll Period</label>
             <CFormInput
-              type="text"
-              placeholder="Enter period (e.g., 202501)"
+              type="month"
               value={downloadPeriod}
               onChange={(e) => setDownloadPeriod(e.target.value)}
               disabled={downloading}
             />
             <small className="text-muted">
-              Format: YYYYMM (e.g., 202501 for January 2025)
+              Select the payroll month to download.
             </small>
           </div>
 

@@ -432,10 +432,6 @@ const EmployeeList = () => {
   const [companyOptionsLoading, setCompanyOptionsLoading] = useState(false);
   const [companyFilterError, setCompanyFilterError] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
-  const [ptkpOptions, setPtkpOptions] = useState([]);
-  const [ptkpOptionsLoading, setPtkpOptionsLoading] = useState(false);
-  const [ptkpFilterError, setPtkpFilterError] = useState('');
-  const [selectedPtkp, setSelectedPtkp] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
@@ -468,7 +464,7 @@ const EmployeeList = () => {
 
   const trimmedSearchTerm = searchTerm.trim();
   const trimmedSearchInput = searchInput.trim();
-  const activeFilterCount = [trimmedSearchTerm, selectedCompanyId, selectedPtkp].filter(Boolean).length;
+  const activeFilterCount = [trimmedSearchTerm, selectedCompanyId].filter(Boolean).length;
 
   const selectedCompanyLabel = useMemo(() => {
     if (!selectedCompanyId) return '';
@@ -479,10 +475,6 @@ const EmployeeList = () => {
 
     return selectedOption?.label || `Company #${selectedCompanyId}`;
   }, [companyOptions, selectedCompanyId]);
-
-  const selectedPtkpLabel = useMemo(() => {
-    return selectedPtkp ? resolvePTKPLabel(selectedPtkp) : '';
-  }, [resolvePTKPLabel, selectedPtkp]);
 
   const uniqueCompanyCount = useMemo(() => {
     if (!employees.length) return 0;
@@ -543,10 +535,6 @@ const EmployeeList = () => {
       filterParts.push(`in ${selectedCompanyLabel}`);
     }
 
-    if (selectedPtkpLabel) {
-      filterParts.push(`with PTKP ${selectedPtkpLabel}`);
-    }
-
     if (totalEmployees > 0) {
       const start = ((currentPage - 1) * rows) + 1;
       const end = Math.min(currentPage * rows, totalEmployees);
@@ -564,7 +552,7 @@ const EmployeeList = () => {
     }
 
     return 'No employees available yet';
-  }, [currentPage, rows, selectedCompanyLabel, selectedPtkpLabel, totalEmployees, trimmedSearchTerm]);
+  }, [currentPage, rows, selectedCompanyLabel, totalEmployees, trimmedSearchTerm]);
 
   // Load employees data
   const loadEmployees = useCallback(async (
@@ -572,16 +560,14 @@ const EmployeeList = () => {
     search = '',
     showSearchIndicator = true,
     rowsOverride,
-    companyId = '',
-    ptkp = ''
+    companyId = ''
   ) => {
     try {
       const effectiveCompanyId = String(companyId || '').trim();
-      const effectivePtkp = String(ptkp || '').trim();
 
       if (showSearchIndicator) {
         setLoading(true);
-        setIsSearching(search.trim() !== '' || effectiveCompanyId !== '' || effectivePtkp !== '');
+        setIsSearching(search.trim() !== '' || effectiveCompanyId !== '');
       }
       setError('');
 
@@ -597,10 +583,6 @@ const EmployeeList = () => {
 
       if (effectiveCompanyId) {
         params.company_id = effectiveCompanyId;
-      }
-
-      if (effectivePtkp) {
-        params.ptkp = effectivePtkp;
       }
 
       const response = await employeeService.getEmployees(params);
@@ -624,7 +606,7 @@ const EmployeeList = () => {
 
   // Initial load
   useEffect(() => {
-    loadEmployees(1, '', true, config.pagination.defaultRows, '', '');
+    loadEmployees(1, '', true, config.pagination.defaultRows, '');
   }, [loadEmployees]);
 
   useEffect(() => {
@@ -660,47 +642,6 @@ const EmployeeList = () => {
       isMounted = false;
     };
   }, []);
-
-  const loadPtkpOptions = useCallback(async () => {
-    try {
-      setPtkpOptionsLoading(true);
-      setPtkpFilterError('');
-
-      const employeeOptions = await employeeService.getAllEmployees();
-      const usedPtkpValues = new Set(
-        (Array.isArray(employeeOptions) ? employeeOptions : [])
-          .map((employee) => String(employee.ptkp || '').trim())
-          .filter(Boolean)
-      );
-      const ptkpOrder = PTKP_OPTIONS.reduce((map, option, index) => {
-        map[option.value] = index;
-        return map;
-      }, {});
-
-      const sortedOptions = Array.from(usedPtkpValues).sort((a, b) => {
-        const orderA = ptkpOrder[a] ?? Number.MAX_SAFE_INTEGER;
-        const orderB = ptkpOrder[b] ?? Number.MAX_SAFE_INTEGER;
-
-        if (orderA !== orderB) {
-          return orderA - orderB;
-        }
-
-        return resolvePTKPLabel(a).localeCompare(resolvePTKPLabel(b));
-      });
-
-      setPtkpOptions(sortedOptions);
-    } catch (error) {
-      console.error('Error loading PTKP filter options:', error);
-      setPtkpOptions([]);
-      setPtkpFilterError('PTKP filter unavailable');
-    } finally {
-      setPtkpOptionsLoading(false);
-    }
-  }, [resolvePTKPLabel]);
-
-  useEffect(() => {
-    loadPtkpOptions();
-  }, [loadPtkpOptions]);
 
   const generateSuggestions = useCallback((searchValue) => {
     const trimmed = searchValue.trim();
@@ -783,8 +724,8 @@ const EmployeeList = () => {
       });
     }
 
-    loadEmployees(1, trimmed, true, rows, selectedCompanyId, selectedPtkp);
-  }, [loadEmployees, rows, selectedCompanyId, selectedPtkp, trimmedSearchInput]);
+    loadEmployees(1, trimmed, true, rows, selectedCompanyId);
+  }, [loadEmployees, rows, selectedCompanyId, trimmedSearchInput]);
 
   const handleSearchFromHistory = useCallback(
     (value) => {
@@ -805,22 +746,21 @@ const EmployeeList = () => {
         return [trimmed, ...filtered].slice(0, 10);
       });
 
-      loadEmployees(1, trimmed, true, rows, selectedCompanyId, selectedPtkp);
+      loadEmployees(1, trimmed, true, rows, selectedCompanyId);
     },
-    [loadEmployees, rows, selectedCompanyId, selectedPtkp]
+    [loadEmployees, rows, selectedCompanyId]
   );
 
   const handleResetSearch = useCallback(() => {
     setSearchInput('');
     setSearchTerm('');
     setSelectedCompanyId('');
-    setSelectedPtkp('');
     setCurrentPage(1);
     setShowSuggestions(false);
     setSearchSuggestions([]);
     setShowSearchHistory(false);
 
-    loadEmployees(1, '', true, rows, '', '');
+    loadEmployees(1, '', true, rows, '');
   }, [loadEmployees, rows]);
 
   const clearSearchHistory = useCallback(() => {
@@ -837,9 +777,9 @@ const EmployeeList = () => {
       setCurrentPage(1);
       setShowSuggestions(false);
 
-      loadEmployees(1, trimmed, true, rows, selectedCompanyId, selectedPtkp);
+      loadEmployees(1, trimmed, true, rows, selectedCompanyId);
     },
-    [loadEmployees, rows, selectedCompanyId, selectedPtkp]
+    [loadEmployees, rows, selectedCompanyId]
   );
 
   const handleCompanyFilterChange = useCallback(
@@ -851,31 +791,17 @@ const EmployeeList = () => {
       setShowSuggestions(false);
       setShowSearchHistory(false);
 
-      loadEmployees(1, searchTerm, true, rows, companyId, selectedPtkp);
+      loadEmployees(1, searchTerm, true, rows, companyId);
     },
-    [loadEmployees, rows, searchTerm, selectedPtkp]
-  );
-
-  const handlePtkpFilterChange = useCallback(
-    (event) => {
-      const ptkp = event.target.value;
-
-      setSelectedPtkp(ptkp);
-      setCurrentPage(1);
-      setShowSuggestions(false);
-      setShowSearchHistory(false);
-
-      loadEmployees(1, searchTerm, true, rows, selectedCompanyId, ptkp);
-    },
-    [loadEmployees, rows, searchTerm, selectedCompanyId]
+    [loadEmployees, rows, searchTerm]
   );
 
   const handlePageChange = useCallback(
     (page) => {
       setCurrentPage(page);
-      loadEmployees(page, searchTerm, true, rows, selectedCompanyId, selectedPtkp);
+      loadEmployees(page, searchTerm, true, rows, selectedCompanyId);
     },
-    [loadEmployees, rows, searchTerm, selectedCompanyId, selectedPtkp]
+    [loadEmployees, rows, searchTerm, selectedCompanyId]
   );
 
   const handleRowsChange = useCallback(
@@ -889,15 +815,14 @@ const EmployeeList = () => {
         clearTimeout(searchDebounceRef.current);
       }
 
-      loadEmployees(1, searchTerm, true, newRows, selectedCompanyId, selectedPtkp);
+      loadEmployees(1, searchTerm, true, newRows, selectedCompanyId);
     },
-    [loadEmployees, searchTerm, selectedCompanyId, selectedPtkp]
+    [loadEmployees, searchTerm, selectedCompanyId]
   );
 
   const handleRefresh = useCallback(() => {
-    loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId, selectedPtkp);
-    loadPtkpOptions();
-  }, [currentPage, loadEmployees, loadPtkpOptions, rows, searchTerm, selectedCompanyId, selectedPtkp]);
+    loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
+  }, [currentPage, loadEmployees, rows, searchTerm, selectedCompanyId]);
 
   const handleDelete = useCallback((employee) => {
     setEmployeeToDelete(employee);
@@ -912,15 +837,14 @@ const EmployeeList = () => {
       await employeeService.deleteEmployee(employeeToDelete.employee_id);
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
-      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId, selectedPtkp);
-      loadPtkpOptions();
+      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
     } catch (error) {
       console.error('Error deleting employee:', error);
       setError(error.message || 'Failed to delete employee');
     } finally {
       setDeleting(false);
     }
-  }, [currentPage, employeeToDelete, loadEmployees, loadPtkpOptions, rows, searchTerm, selectedCompanyId, selectedPtkp]);
+  }, [currentPage, employeeToDelete, loadEmployees, rows, searchTerm, selectedCompanyId]);
 
   const handleOpenSyncModal = useCallback(() => {
     setShowSyncModal(true);
@@ -943,8 +867,7 @@ const EmployeeList = () => {
       setInfoMessage(
         'Sinkronisasi karyawan sedang diproses. Data akan diperbarui setelah backend menyelesaikan proses.'
       );
-      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId, selectedPtkp);
-      loadPtkpOptions();
+      loadEmployees(currentPage, searchTerm, true, rows, selectedCompanyId);
     } catch (syncError) {
       console.error('Error syncing employees:', syncError);
       setShowSyncModal(false);
@@ -953,7 +876,7 @@ const EmployeeList = () => {
     } finally {
       setSyncing(false);
     }
-  }, [currentPage, loadEmployees, loadPtkpOptions, rows, searchTerm, selectedCompanyId, selectedPtkp]);
+  }, [currentPage, loadEmployees, rows, searchTerm, selectedCompanyId]);
 
   const handleCreateEmployee = useCallback(() => {
     navigate('/employees/create');
@@ -1267,36 +1190,6 @@ const EmployeeList = () => {
               </div>
 
               <div className="employee-filter-field">
-                <label className="employee-filter-label" htmlFor="employee-ptkp-filter">
-                  PTKP
-                </label>
-                <CFormSelect
-                  id="employee-ptkp-filter"
-                  className="employee-filter-control"
-                  value={selectedPtkp}
-                  onChange={handlePtkpFilterChange}
-                  disabled={ptkpOptionsLoading}
-                >
-                  <option value="">All PTKP</option>
-                  {ptkpOptionsLoading && (
-                    <option disabled>Loading PTKP...</option>
-                  )}
-                  {!ptkpOptionsLoading && ptkpOptions.length === 0 && (
-                    <option disabled>No PTKP filled</option>
-                  )}
-                  {!ptkpOptionsLoading &&
-                    ptkpOptions.map((ptkp) => (
-                      <option key={ptkp} value={ptkp}>
-                        {resolvePTKPLabel(ptkp)}
-                      </option>
-                    ))}
-                </CFormSelect>
-                {ptkpFilterError && (
-                  <small className="text-warning d-block mt-1">{ptkpFilterError}</small>
-                )}
-              </div>
-
-              <div className="employee-filter-field">
                 <label className="employee-filter-label" htmlFor="employee-rows-filter">
                   Rows
                 </label>
@@ -1337,7 +1230,7 @@ const EmployeeList = () => {
                 color="light"
                 className="text-danger border"
                 onClick={handleResetSearch}
-                disabled={!trimmedSearchTerm && !trimmedSearchInput && !selectedCompanyId && !selectedPtkp}
+                disabled={!trimmedSearchTerm && !trimmedSearchInput && !selectedCompanyId}
               >
                 <CIcon icon={cilTrash} className="me-2" />
                 Reset
@@ -1495,20 +1388,20 @@ const EmployeeList = () => {
                   <CTableDataCell colSpan={7} className="text-center py-5">
                     <div className="py-4">
                       <CIcon
-                        icon={trimmedSearchTerm || selectedCompanyId || selectedPtkp ? cilMagnifyingGlass : cilPeople}
+                        icon={trimmedSearchTerm || selectedCompanyId ? cilMagnifyingGlass : cilPeople}
                         className="text-primary mb-3"
                         size="xl"
                       />
                       <h5 className="fw-semibold mb-2">
-                        {trimmedSearchTerm || selectedCompanyId || selectedPtkp ? 'No matching employees' : 'No employees on record yet'}
+                        {trimmedSearchTerm || selectedCompanyId ? 'No matching employees' : 'No employees on record yet'}
                       </h5>
                       <p className="text-medium-emphasis mb-4">
-                        {trimmedSearchTerm || selectedCompanyId || selectedPtkp
+                        {trimmedSearchTerm || selectedCompanyId
                           ? 'Adjust your filters or clear them to see the full directory.'
                           : 'Start building your organisation by adding your first employee profile.'}
                       </p>
                       <div className="d-flex justify-content-center gap-3 flex-wrap">
-                        {(trimmedSearchTerm || selectedCompanyId || selectedPtkp) && (
+                        {(trimmedSearchTerm || selectedCompanyId) && (
                           <CButton color="link" className="text-decoration-none" onClick={handleResetSearch}>
                             Clear filters
                           </CButton>

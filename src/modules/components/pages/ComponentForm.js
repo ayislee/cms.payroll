@@ -48,7 +48,6 @@ const CALCULATION_FORMULAS = [
       deductible_components: [],
       pension_components: [],
       additional_deduction: 0,
-      months_in_year: 12,
       job_expense_max: 500000,
     },
     fields: [
@@ -124,16 +123,6 @@ const CALCULATION_FORMULAS = [
         step: 1,
         helpText:
           'Nominal pengurang bulanan tambahan di luar komponen deduction dan pension pada mode Progressive.',
-        visibleWhen: (params) => params.method === 'progressive',
-      },
-      {
-        name: 'months_in_year',
-        label: 'Months In Year',
-        type: 'number',
-        min: 1,
-        step: 1,
-        helpText:
-          'Jumlah bulan untuk annualisasi penghasilan pada mode Progressive. Umumnya 12 bulan.',
         visibleWhen: (params) => params.method === 'progressive',
       },
       {

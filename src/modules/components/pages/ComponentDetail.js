@@ -58,6 +58,15 @@ const parseCalculationParams = (params) => {
   return params;
 };
 
+const sanitizeCalculationParamsForDisplay = (params) => {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    return params;
+  }
+
+  const { months_in_year, ...displayParams } = params;
+  return displayParams;
+};
+
 const ComponentDetail = () => {
   const { id } = useParams();
   const { hasPermission } = useAuth();
@@ -78,7 +87,9 @@ const ComponentDetail = () => {
           // Parse calculation_params to ensure it's always an object
           const processedData = {
             ...componentData,
-            calculation_params: parseCalculationParams(componentData.calculation_params)
+            calculation_params: sanitizeCalculationParamsForDisplay(
+              parseCalculationParams(componentData.calculation_params)
+            )
           };
 
 

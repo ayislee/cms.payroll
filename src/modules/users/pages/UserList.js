@@ -57,6 +57,7 @@ import { formatDate, formatDateTime, formatPhoneNumber } from '../../../utils/fo
 import { PERMISSIONS, USER_ROLES } from '../../../constants/userRoles';
 import userService from '../services/userService';
 import config from '../../../config/environment';
+import { readSessionFilter, writeSessionFilter, normalizePageSize } from '../../../utils/filterPersistence';
 
 const userListStyles = `
   .users-hero {
@@ -260,19 +261,41 @@ const STATUS_FILTERS = [
 const SUGGESTION_LIMIT = 6;
 const SEARCH_HISTORY_LIMIT = 8;
 const SEARCH_HISTORY_STORAGE_KEY = 'cms.payroll.user-search-history';
+const USER_FILTER_STORAGE_KEY = 'cms.payroll.filters.users';
+
+const createDefaultUserFilters = () => ({
+  search: '',
+  status: 'all',
+  rows: config.pagination.defaultRows
+});
+
+const readUserFilters = () =>
+  readSessionFilter(USER_FILTER_STORAGE_KEY, createDefaultUserFilters(), (filters, fallback) => {
+    const status = STATUS_FILTERS.some((filter) => filter.id === filters.status)
+      ? filters.status
+      : fallback.status;
+
+    return {
+      search: String(filters.search || ''),
+      status,
+      rows: normalizePageSize(filters.rows, fallback.rows, config.pagination.pageSizeOptions)
+    };
+  });
 
 const UserList = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
 
   useDocumentTitle('User Management');
+  const persistedFiltersRef = useRef(readUserFilters());
+  const hasLoadedInitialUsersRef = useRef(false);
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => persistedFiltersRef.current.search);
+  const [searchInput, setSearchInput] = useState(() => persistedFiltersRef.current.search);
   const [isSearching, setIsSearching] = useState(false);
   const [searchHistory, setSearchHistory] = useState(() => {
     if (typeof window === 'undefined') return [];
@@ -291,8 +314,8 @@ const UserList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
-  const [rows, setRows] = useState(config.pagination.defaultRows);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [rows, setRows] = useState(() => persistedFiltersRef.current.rows);
+  const [statusFilter, setStatusFilter] = useState(() => persistedFiltersRef.current.status);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -366,7 +389,13 @@ const UserList = () => {
   );
 
   useEffect(() => {
-    loadUsers();
+    if (hasLoadedInitialUsersRef.current) {
+      return;
+    }
+
+    hasLoadedInitialUsersRef.current = true;
+    const persistedFilters = persistedFiltersRef.current;
+    loadUsers(1, persistedFilters.search, persistedFilters.status, persistedFilters.rows);
   }, [loadUsers]);
 
   useEffect(() => {
@@ -503,9 +532,14 @@ const UserList = () => {
         });
       }
 
+      writeSessionFilter(USER_FILTER_STORAGE_KEY, {
+        search: trimmed,
+        status: statusFilter,
+        rows
+      });
       loadUsers(1, trimmed, statusFilter);
     },
-    [loadUsers, statusFilter]
+    [loadUsers, rows, statusFilter]
   );
 
   const handleSearchInputChange = useCallback(
@@ -525,6 +559,11 @@ const UserList = () => {
         setShowSuggestions(false);
         searchDebounceRef.current = setTimeout(() => {
           setSearchTerm('');
+          writeSessionFilter(USER_FILTER_STORAGE_KEY, {
+            search: '',
+            status: statusFilter,
+            rows
+          });
           loadUsers(1, '', statusFilter);
         }, 300);
         return;
@@ -544,10 +583,15 @@ const UserList = () => {
 
       searchDebounceRef.current = setTimeout(() => {
         setSearchTerm(trimmed);
+        writeSessionFilter(USER_FILTER_STORAGE_KEY, {
+          search: trimmed,
+          status: statusFilter,
+          rows
+        });
         loadUsers(1, trimmed, statusFilter);
       }, 400);
     },
-    [loadUsers, searchIndex, statusFilter]
+    [loadUsers, rows, searchIndex, statusFilter]
   );
 
   const handleSearchKeyDown = useCallback(
@@ -583,8 +627,13 @@ const UserList = () => {
     setSearchInput('');
     setShowSuggestions(false);
     setShowSearchHistory(false);
+    writeSessionFilter(USER_FILTER_STORAGE_KEY, {
+      search: '',
+      status: statusFilter,
+      rows
+    });
     loadUsers(1, '', statusFilter);
-  }, [loadUsers, statusFilter]);
+  }, [loadUsers, rows, statusFilter]);
 
   const clearSearchHistory = useCallback(() => {
     setSearchHistory([]);
@@ -596,9 +645,14 @@ const UserList = () => {
       if (filterId === statusFilter) return;
       setStatusFilter(filterId);
       setCurrentPage(1);
+      writeSessionFilter(USER_FILTER_STORAGE_KEY, {
+        search: searchTerm,
+        status: filterId,
+        rows
+      });
       loadUsers(1, searchTerm, filterId);
     },
-    [loadUsers, searchTerm, statusFilter]
+    [loadUsers, rows, searchTerm, statusFilter]
   );
 
   const handleRowsChange = useCallback(
@@ -606,6 +660,11 @@ const UserList = () => {
       const size = Number(value) || config.pagination.defaultRows;
       setRows(size);
       setCurrentPage(1);
+      writeSessionFilter(USER_FILTER_STORAGE_KEY, {
+        search: searchTerm,
+        status: statusFilter,
+        rows: size
+      });
       loadUsers(1, searchTerm, statusFilter, size);
     },
     [loadUsers, searchTerm, statusFilter]
@@ -750,7 +809,7 @@ const UserList = () => {
             </div>
             <div className="text-end">
               <small className="text-medium-emphasis">
-                {totalUsers} data • {rows} per halaman
+                {totalUsers} data â€¢ {rows} per halaman
               </small>
             </div>
           </div>

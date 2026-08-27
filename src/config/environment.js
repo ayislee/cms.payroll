@@ -20,6 +20,7 @@ const config = {
   // Application Configuration
   app: {
     name: getEnv('VITE_APP_NAME', 'Payroll Management System'),
+    description: getEnv('VITE_APP_DESCRIPTION', 'TEMA INTERNAL'),
     version: getEnv('VITE_APP_VERSION', '1.0.0'),
     port: getNumberEnv('VITE_APP_PORT', 7000),
     debug: getBooleanEnv('VITE_APP_DEBUG', false),

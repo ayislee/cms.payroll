@@ -56,25 +56,56 @@ import { useDocumentTitle } from '../../../utils/documentTitle';
 import { formatPayrollPeriod, formatDate as formatDisplayDate } from '../../../utils/formatters';
 import attendanceService from '../services/attendanceService';
 import employeeService from '../../employees/services/employeeService';
+import { readSessionFilter, writeSessionFilter, normalizePageSize } from '../../../utils/filterPersistence';
+
+const ATTENDANCE_FILTER_STORAGE_KEY = 'cms.payroll.filters.attendance';
+const ATTENDANCE_PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100];
+
+const createDefaultAttendanceFilters = () => ({
+  search: '',
+  payroll_periode: '',
+  employee_id: '',
+  pageSize: 10,
+  showFilters: false
+});
+
+const readAttendanceFilters = () =>
+  readSessionFilter(ATTENDANCE_FILTER_STORAGE_KEY, createDefaultAttendanceFilters(), (filters, fallback) => {
+    const payrollPeriod = String(filters.payroll_periode || '').trim();
+    const employeeId = String(filters.employee_id || '').trim();
+
+    return {
+      search: String(filters.search || ''),
+      payroll_periode: payrollPeriod === '' || /^\d{6}$/.test(payrollPeriod)
+        ? payrollPeriod
+        : fallback.payroll_periode,
+      employee_id: employeeId === '' || /^\d+$/.test(employeeId)
+        ? employeeId
+        : fallback.employee_id,
+      pageSize: normalizePageSize(filters.pageSize, fallback.pageSize, ATTENDANCE_PAGE_SIZE_OPTIONS),
+      showFilters: Boolean(filters.showFilters || payrollPeriod || employeeId)
+    };
+  });
 
 const AttendanceList = () => {
+  const persistedFilters = useMemo(() => readAttendanceFilters(), []);
   const [attendances, setAttendances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
-  const [searchTerm, setSearchTerm] = useState(''); // Current input value
-  const [appliedSearchTerm, setAppliedSearchTerm] = useState(''); // Search term that's been applied
-  const [showFilters, setShowFilters] = useState(false);
+  const [pageSize, setPageSize] = useState(() => persistedFilters.pageSize);
+  const [searchTerm, setSearchTerm] = useState(() => persistedFilters.search);
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState(() => persistedFilters.search);
+  const [showFilters, setShowFilters] = useState(() => persistedFilters.showFilters);
   const [filters, setFilters] = useState({
-    payroll_periode: '',
-    employee_id: ''
+    payroll_periode: persistedFilters.payroll_periode,
+    employee_id: persistedFilters.employee_id
   });
   const [appliedFilters, setAppliedFilters] = useState({
-    payroll_periode: '',
-    employee_id: ''
+    payroll_periode: persistedFilters.payroll_periode,
+    employee_id: persistedFilters.employee_id
   });
   const initialFormState = {
     employee_id: '',
@@ -227,6 +258,17 @@ const AttendanceList = () => {
     }));
   };
 
+  const handleToggleFilters = () => {
+    const nextShowFilters = !showFilters;
+    setShowFilters(nextShowFilters);
+    writeSessionFilter(ATTENDANCE_FILTER_STORAGE_KEY, {
+      search: appliedSearchTerm,
+      ...appliedFilters,
+      pageSize,
+      showFilters: nextShowFilters
+    });
+  };
+
   const handleOpenSyncModal = () => {
     if (syncLoading) {
       return;
@@ -322,34 +364,55 @@ const AttendanceList = () => {
   // Handle search form submission - only time we hit the API
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setAppliedSearchTerm(searchTerm.trim());
-    setAppliedFilters({
+    const nextSearch = searchTerm.trim();
+    const nextFilters = {
       payroll_periode: filters.payroll_periode.trim(),
       employee_id: filters.employee_id.trim()
-    });
+    };
+
+    setSearchTerm(nextSearch);
+    setFilters(nextFilters);
+    setAppliedSearchTerm(nextSearch);
+    setAppliedFilters(nextFilters);
     setCurrentPage(1);
+    writeSessionFilter(ATTENDANCE_FILTER_STORAGE_KEY, {
+      search: nextSearch,
+      ...nextFilters,
+      pageSize,
+      showFilters
+    });
   };
 
   // Remove the auto-search debounce effect completely
   // We only want to search when user explicitly submits
 
   const resetFilters = () => {
-    setSearchTerm('');
-    setAppliedSearchTerm('');
+    const defaultFilters = createDefaultAttendanceFilters();
+    setSearchTerm(defaultFilters.search);
+    setAppliedSearchTerm(defaultFilters.search);
     setFilters({
-      payroll_periode: '',
-      employee_id: ''
+      payroll_periode: defaultFilters.payroll_periode,
+      employee_id: defaultFilters.employee_id
     });
     setAppliedFilters({
-      payroll_periode: '',
-      employee_id: ''
+      payroll_periode: defaultFilters.payroll_periode,
+      employee_id: defaultFilters.employee_id
     });
+    setPageSize(defaultFilters.pageSize);
+    setShowFilters(defaultFilters.showFilters);
     setCurrentPage(1);
+    writeSessionFilter(ATTENDANCE_FILTER_STORAGE_KEY, defaultFilters);
   };
 
   const handlePageSizeChange = (size) => {
     setPageSize(size);
     setCurrentPage(1);
+    writeSessionFilter(ATTENDANCE_FILTER_STORAGE_KEY, {
+      search: appliedSearchTerm,
+      ...appliedFilters,
+      pageSize: size,
+      showFilters
+    });
   };
 
   const resolvePeriodLabel = (period) => {
@@ -820,7 +883,7 @@ const AttendanceList = () => {
                 <CButton
                   color="secondary"
                   variant="outline"
-                  onClick={() => setShowFilters(!showFilters)}
+                  onClick={handleToggleFilters}
                 >
                   <CIcon icon={cilFilter} className="me-1" />
                   {showFilters ? 'Hide Filters' : 'Show Filters'}

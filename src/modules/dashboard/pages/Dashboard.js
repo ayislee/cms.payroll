@@ -36,8 +36,10 @@ import {
   formatPayrollPeriod,
   getCurrentPayrollPeriod,
   getCurrentPayrollPickerValue,
-  pickerValueToPayrollPeriod
+  pickerValueToPayrollPeriod,
+  payrollPeriodToPickerValue
 } from '../../../utils/formatters';
+import { readSessionFilter, writeSessionFilter } from '../../../utils/filterPersistence';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import apiClient from '../../../utils/apiClient';
 import { API_ENDPOINTS } from '../../../constants/apiEndpoints';
@@ -58,6 +60,8 @@ const formatPeriodLabel = (period, fallbackLabel) => {
 };
 
 const toLocaleNumber = (value) => Number(value || 0).toLocaleString('id-ID');
+const DASHBOARD_FILTER_STORAGE_KEY = 'cms.payroll.filters.dashboard';
+
 const createDefaultActiveFilters = () => {
   const currentPeriod = getCurrentPayrollPeriod();
 
@@ -78,13 +82,42 @@ const createDefaultFilterForm = () => {
   };
 };
 
+const normalizeDashboardFilters = (filters, fallback) => ({
+  companyId: String(filters.companyId || ''),
+  periodStart: /^\d{6}$/.test(String(filters.periodStart || ''))
+    ? String(filters.periodStart)
+    : fallback.periodStart,
+  periodEnd: /^\d{6}$/.test(String(filters.periodEnd || ''))
+    ? String(filters.periodEnd)
+    : fallback.periodEnd
+});
+
+const readDashboardFilters = () =>
+  readSessionFilter(
+    DASHBOARD_FILTER_STORAGE_KEY,
+    createDefaultActiveFilters(),
+    normalizeDashboardFilters
+  );
+
+const createFilterFormFromActiveFilters = (filters) => {
+  const defaultForm = createDefaultFilterForm();
+
+  return {
+    companyId: filters.companyId || '',
+    periodStart: payrollPeriodToPickerValue(filters.periodStart) || defaultForm.periodStart,
+    periodEnd: payrollPeriodToPickerValue(filters.periodEnd) || defaultForm.periodEnd
+  };
+};
+
 const Dashboard = () => {
   const { hasPermission } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [overview, setOverview] = useState(null);
-  const [activeFilters, setActiveFilters] = useState(() => createDefaultActiveFilters());
-  const [filterForm, setFilterForm] = useState(() => createDefaultFilterForm());
+  const [activeFilters, setActiveFilters] = useState(() => readDashboardFilters());
+  const [filterForm, setFilterForm] = useState(() =>
+    createFilterFormFromActiveFilters(readDashboardFilters())
+  );
   const [companyOptions, setCompanyOptions] = useState([
     { value: '', label: 'Semua Perusahaan' }
   ]);
@@ -187,11 +220,14 @@ const Dashboard = () => {
 
     setFilterForm(nextFormValues);
     setActiveFilters(nextActiveFilters);
+    writeSessionFilter(DASHBOARD_FILTER_STORAGE_KEY, nextActiveFilters);
   };
 
   const handleFilterReset = () => {
+    const defaultActiveFilters = createDefaultActiveFilters();
     setFilterForm(createDefaultFilterForm());
-    setActiveFilters(createDefaultActiveFilters());
+    setActiveFilters(defaultActiveFilters);
+    writeSessionFilter(DASHBOARD_FILTER_STORAGE_KEY, defaultActiveFilters);
   };
 
   const employeesMetrics = overview?.metrics?.employees || {

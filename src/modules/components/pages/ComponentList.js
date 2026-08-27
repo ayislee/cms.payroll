@@ -52,10 +52,32 @@ import { useDocumentTitle } from '../../../utils/documentTitle';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import componentService from '../services/componentService';
 import { formatNumber } from '../../../utils/formatters';
+import { readSessionFilter, writeSessionFilter } from '../../../utils/filterPersistence';
+
+const COMPONENT_FILTER_STORAGE_KEY = 'cms.payroll.filters.components';
+
+const createDefaultComponentFilters = () => ({
+  search: '',
+  type: 'all',
+  status: 'all',
+  category: 'all'
+});
+
+const COMPONENT_TYPE_FILTERS = ['all', 'Earning', 'Deduction'];
+const COMPONENT_STATUS_FILTERS = ['all', 'active', 'inactive'];
+
+const readComponentFilters = () =>
+  readSessionFilter(COMPONENT_FILTER_STORAGE_KEY, createDefaultComponentFilters(), (filters, fallback) => ({
+    search: String(filters.search || ''),
+    type: COMPONENT_TYPE_FILTERS.includes(filters.type) ? filters.type : fallback.type,
+    status: COMPONENT_STATUS_FILTERS.includes(filters.status) ? filters.status : fallback.status,
+    category: String(filters.category || fallback.category)
+  }));
 
 const ComponentList = () => {
   const { hasPermission } = useAuth();
   useDocumentTitle('Payroll Components');
+  const persistedFilters = useMemo(() => readComponentFilters(), []);
 
   const [components, setComponents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,10 +86,10 @@ const ComponentList = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState(() => persistedFilters.search);
+  const [typeFilter, setTypeFilter] = useState(() => persistedFilters.type);
+  const [statusFilter, setStatusFilter] = useState(() => persistedFilters.status);
+  const [categoryFilter, setCategoryFilter] = useState(() => persistedFilters.category);
 
   const loadComponents = async () => {
     try {
@@ -111,12 +133,27 @@ const ComponentList = () => {
     loadComponents();
   }, []);
 
+  useEffect(() => {
+    writeSessionFilter(COMPONENT_FILTER_STORAGE_KEY, {
+      search: searchTerm,
+      type: typeFilter,
+      status: statusFilter,
+      category: categoryFilter
+    });
+  }, [categoryFilter, searchTerm, statusFilter, typeFilter]);
+
   const categories = useMemo(() => {
     const uniqueCategories = new Set(
       components.map((component) => component.category).filter(Boolean)
     );
     return Array.from(uniqueCategories).sort((a, b) => a.localeCompare(b));
   }, [components]);
+
+  useEffect(() => {
+    if (categoryFilter !== 'all' && categories.length > 0 && !categories.includes(categoryFilter)) {
+      setCategoryFilter('all');
+    }
+  }, [categories, categoryFilter]);
 
   const filteredComponents = useMemo(() => {
     return components.filter((component) => {
@@ -159,10 +196,12 @@ const ComponentList = () => {
   }, [components]);
 
   const resetFilters = () => {
-    setSearchTerm('');
-    setTypeFilter('all');
-    setStatusFilter('all');
-    setCategoryFilter('all');
+    const defaultFilters = createDefaultComponentFilters();
+    setSearchTerm(defaultFilters.search);
+    setTypeFilter(defaultFilters.type);
+    setStatusFilter(defaultFilters.status);
+    setCategoryFilter(defaultFilters.category);
+    writeSessionFilter(COMPONENT_FILTER_STORAGE_KEY, defaultFilters);
   };
 
   if (loading) {

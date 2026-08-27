@@ -70,33 +70,33 @@ const _nav = [
     icon: <CIcon icon={cilCalendar} customClassName="nav-icon" />,
     
   },
-  {
-    component: CNavTitle,
-    name: 'Reports & Analytics'
-  },
-  {
-    component: CNavGroup,
-    name: 'Reports',
-    to: '/reports',
-    icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'All Reports',
-        to: '/reports'
-      },
-      {
-        component: CNavItem,
-        name: 'Payroll Report',
-        to: '/reports/payroll'
-      },
-      {
-        component: CNavItem,
-        name: 'Employee Report',
-        to: '/reports/employee'
-      }
-    ]
-  },
+  // {
+  //   component: CNavTitle,
+  //   name: 'Reports & Analytics'
+  // },
+  // {
+  //   component: CNavGroup,
+  //   name: 'Reports',
+  //   to: '/reports',
+  //   icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+  //   items: [
+  //     {
+  //       component: CNavItem,
+  //       name: 'All Reports',
+  //       to: '/reports'
+  //     },
+  //     {
+  //       component: CNavItem,
+  //       name: 'Payroll Report',
+  //       to: '/reports/payroll'
+  //     },
+  //     {
+  //       component: CNavItem,
+  //       name: 'Employee Report',
+  //       to: '/reports/employee'
+  //     }
+  //   ]
+  // },
   {
     component: CNavTitle,
     name: 'System Administration'
@@ -107,12 +107,12 @@ const _nav = [
     to: '/settings',
     icon: <CIcon icon={cilCog} customClassName="nav-icon" />
   },
-  {
-    component: CNavItem,
-    name: 'System Health',
-    to: '/system/health',
-    icon: <CIcon icon={cilClipboard} customClassName="nav-icon" />
-  }
+  // {
+  //   component: CNavItem,
+  //   name: 'System Health',
+  //   to: '/system/health',
+  //   icon: <CIcon icon={cilClipboard} customClassName="nav-icon" />
+  // }
 ]
 
 export default _nav

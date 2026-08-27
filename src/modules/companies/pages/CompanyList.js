@@ -57,6 +57,7 @@ import { formatDate, formatDateTime, formatPhoneNumber } from '../../../utils/fo
 import { PERMISSIONS } from '../../../constants/userRoles';
 import companyService from '../services/companyService';
 import config from '../../../config/environment';
+import { readSessionFilter, writeSessionFilter, normalizePageSize } from '../../../utils/filterPersistence';
 
 const companyListStyles = `
   .companies-hero {
@@ -293,24 +294,46 @@ const STATUS_FILTERS = [
 const SUGGESTION_LIMIT = 6;
 const SEARCH_HISTORY_LIMIT = 8;
 const SEARCH_HISTORY_STORAGE_KEY = 'cms.payroll.company-search-history';
+const COMPANY_FILTER_STORAGE_KEY = 'cms.payroll.filters.companies';
+
+const createDefaultCompanyFilters = () => ({
+  search: '',
+  status: 'all',
+  rows: config.pagination.defaultRows
+});
+
+const readCompanyFilters = () =>
+  readSessionFilter(COMPANY_FILTER_STORAGE_KEY, createDefaultCompanyFilters(), (filters, fallback) => {
+    const status = STATUS_FILTERS.some((filter) => filter.id === filters.status)
+      ? filters.status
+      : fallback.status;
+
+    return {
+      search: String(filters.search || ''),
+      status,
+      rows: normalizePageSize(filters.rows, fallback.rows, config.pagination.pageSizeOptions)
+    };
+  });
 
 const CompanyList = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
 
   useDocumentTitle('Company Management');
+  const persistedFiltersRef = useRef(readCompanyFilters());
+  const hasLoadedInitialCompaniesRef = useRef(false);
 
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => persistedFiltersRef.current.search);
+  const [searchInput, setSearchInput] = useState(() => persistedFiltersRef.current.search);
   const [isSearching, setIsSearching] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCompanies, setTotalCompanies] = useState(0);
-  const [rows, setRows] = useState(config.pagination.defaultRows);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [rows, setRows] = useState(() => persistedFiltersRef.current.rows);
+  const [statusFilter, setStatusFilter] = useState(() => persistedFiltersRef.current.status);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -429,7 +452,13 @@ const CompanyList = () => {
   );
 
   useEffect(() => {
-    loadCompanies(1);
+    if (hasLoadedInitialCompaniesRef.current) {
+      return;
+    }
+
+    hasLoadedInitialCompaniesRef.current = true;
+    const persistedFilters = persistedFiltersRef.current;
+    loadCompanies(1, persistedFilters.search, persistedFilters.status, persistedFilters.rows);
   }, [loadCompanies]);
 
   const summaryStats = useMemo(
@@ -554,9 +583,14 @@ const CompanyList = () => {
         });
       }
 
+      writeSessionFilter(COMPANY_FILTER_STORAGE_KEY, {
+        search: trimmed,
+        status: statusFilter,
+        rows
+      });
       loadCompanies(1, trimmed, statusFilter);
     },
-    [loadCompanies, statusFilter]
+    [loadCompanies, rows, statusFilter]
   );
 
   const handleSearchInputChange = useCallback(
@@ -576,6 +610,11 @@ const CompanyList = () => {
         setShowSuggestions(false);
         searchDebounceRef.current = setTimeout(() => {
           setSearchTerm('');
+          writeSessionFilter(COMPANY_FILTER_STORAGE_KEY, {
+            search: '',
+            status: statusFilter,
+            rows
+          });
           loadCompanies(1, '', statusFilter);
         }, 300);
         return;
@@ -591,10 +630,15 @@ const CompanyList = () => {
 
       searchDebounceRef.current = setTimeout(() => {
         setSearchTerm(trimmed);
+        writeSessionFilter(COMPANY_FILTER_STORAGE_KEY, {
+          search: trimmed,
+          status: statusFilter,
+          rows
+        });
         loadCompanies(1, trimmed, statusFilter);
       }, 400);
     },
-    [loadCompanies, searchIndex, statusFilter]
+    [loadCompanies, rows, searchIndex, statusFilter]
   );
 
   const handleSearchKeyDown = useCallback(
@@ -630,8 +674,13 @@ const CompanyList = () => {
     setSearchInput('');
     setShowSuggestions(false);
     setShowSearchHistory(false);
+    writeSessionFilter(COMPANY_FILTER_STORAGE_KEY, {
+      search: '',
+      status: statusFilter,
+      rows
+    });
     loadCompanies(1, '', statusFilter);
-  }, [loadCompanies, statusFilter]);
+  }, [loadCompanies, rows, statusFilter]);
 
   const clearSearchHistory = useCallback(() => {
     setSearchHistory([]);
@@ -643,9 +692,14 @@ const CompanyList = () => {
       if (filterId === statusFilter) return;
       setStatusFilter(filterId);
       setCurrentPage(1);
+      writeSessionFilter(COMPANY_FILTER_STORAGE_KEY, {
+        search: searchTerm,
+        status: filterId,
+        rows
+      });
       loadCompanies(1, searchTerm, filterId);
     },
-    [loadCompanies, searchTerm, statusFilter]
+    [loadCompanies, rows, searchTerm, statusFilter]
   );
 
   const handleRowsChange = useCallback(
@@ -653,6 +707,11 @@ const CompanyList = () => {
       const size = Number(value) || config.pagination.defaultRows;
       setRows(size);
       setCurrentPage(1);
+      writeSessionFilter(COMPANY_FILTER_STORAGE_KEY, {
+        search: searchTerm,
+        status: statusFilter,
+        rows: size
+      });
       loadCompanies(1, searchTerm, statusFilter, size);
     },
     [loadCompanies, searchTerm, statusFilter]

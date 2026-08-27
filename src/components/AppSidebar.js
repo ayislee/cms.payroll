@@ -15,6 +15,7 @@ import { AppSidebarNav } from './AppSidebarNav'
 
 import { logo } from 'src/assets/brand/logo'
 import { sygnet } from 'src/assets/brand/sygnet'
+import config from '../config/environment'
 
 // sidebar nav config
 import navigation from '../_nav'
@@ -36,10 +37,18 @@ const AppSidebar = () => {
       }}
     >
       <CSidebarHeader className="border-bottom">
-        <CSidebarBrand to="/">
-          <CIcon customClassName="sidebar-brand-full" icon={logo} height={32} />
-          {/* <CIcon customClassName="sidebar-brand-narrow" icon={sygnet} height={32} /> */}
-        </CSidebarBrand>
+        <div className="d-flex flex-column align-items-start py-2">
+          <CSidebarBrand to="/" className="m-0 p-0">
+            <CIcon customClassName="sidebar-brand-full" icon={logo} height={32} />
+            {/* <CIcon customClassName="sidebar-brand-narrow" icon={sygnet} height={32} /> */}
+          </CSidebarBrand>
+          <span
+            className="sidebar-brand-full text-white mt-1"
+            style={{ fontSize: '0.72rem', fontWeight: 500, lineHeight: 1.1, marginLeft: '6px' }}
+          >
+            {config.app.description}
+          </span>
+        </div>
         <CCloseButton
           className="d-lg-none"
           dark

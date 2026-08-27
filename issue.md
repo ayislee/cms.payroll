@@ -1,144 +1,182 @@
-# Issue: Ubah Input Payroll Period Menjadi Date Picker
+# Issue: Persist Filter Dashboard dan List Page di Frontend
 
 ## Informasi Umum
 
 - Backend: `core.payroll`
 - Frontend: `cms.payroll`
 - Area kerja utama: frontend
-- Halaman terdampak:
-  - `/dashboard`
-  - `/payroll`
-
-## Tujuan
-
-Mengganti input periode payroll yang saat ini masih berupa text/manual `YYYYMM` menjadi date picker agar user tidak perlu mengetik format periode secara manual.
-
-Secara backend, format periode yang dikirim tetap mengikuti kontrak existing yaitu `YYYYMM`, misalnya `202608`. Perubahan ini diutamakan di sisi frontend dengan konversi nilai date picker sebelum request dikirim ke API.
+- Tujuan: filter pada dashboard dan halaman list tidak kembali ke default ketika user meninggalkan halaman lalu kembali lagi.
 
 ## Latar Belakang
 
-Saat ini beberapa input periode masih memakai text input dengan instruksi format `YYYYMM`. Ini rawan salah input, misalnya user mengetik jumlah digit kurang, urutan bulan salah, atau karakter selain angka.
+Saat ini dashboard dan beberapa halaman list di frontend menyimpan filter hanya di state React halaman. Ketika user pindah halaman, misalnya masuk ke detail/form atau membuka menu lain, komponen halaman ter-mount ulang dan filter kembali ke nilai default.
 
-Dengan date picker, user cukup memilih periode melalui UI. Aplikasi tetap menyimpan dan mengirim periode ke backend dalam format yang sudah dipakai sistem.
+Perubahan yang dibutuhkan adalah menyimpan filter terakhir per halaman, lalu memakainya lagi saat halaman tersebut dibuka kembali.
 
-## Scope Implementasi
+## Scope Halaman
 
 ### 1. Dashboard `/dashboard`
 
 File utama yang perlu dicek:
 
 - `src/modules/dashboard/pages/Dashboard.js`
-- `src/utils/formatters.js`
 
-Perubahan yang diharapkan:
+Filter yang harus dipertahankan:
 
-1. Input `Periode Mulai` dan `Periode Akhir` pada filter dashboard diganti dari text input menjadi date picker periode.
-2. Karena periode payroll berbentuk bulanan, implementer disarankan memakai picker bulan, misalnya native input `type="month"` jika tetap menggunakan `CFormInput`.
-3. Nilai default `Periode Mulai` dan `Periode Akhir` menggunakan periode berjalan.
-4. Periode berjalan mengikuti bulan dan tahun tanggal saat user membuka halaman, lalu dikonversi menjadi format payroll period `YYYYMM`.
-5. Saat klik `Terapkan`, value yang dikirim ke endpoint dashboard tetap:
-   - `period_start=YYYYMM`
-   - `period_end=YYYYMM`
-6. Saat klik `Reset`, filter kembali ke default periode berjalan, bukan dikosongkan.
-7. Label/ringkasan periode dashboard tetap tampil user-friendly, misalnya memakai helper `formatPayrollPeriod`.
+- Company
+- Periode mulai
+- Periode akhir
 
-Catatan teknis:
+### 2. Employees `/employees`
 
-- `src/utils/formatters.js` sudah memiliki helper `getCurrentPayrollPeriod()`, `formatPayrollPeriod()`, dan `parsePayrollPeriod()`.
-- Jika input UI memakai format native `YYYY-MM`, siapkan helper kecil untuk konversi:
-  - date picker value `YYYY-MM` ke API value `YYYYMM`
-  - API value `YYYYMM` ke date picker value `YYYY-MM`
-- Hindari mengubah kontrak API dashboard kecuali benar-benar diperlukan.
+File utama yang perlu dicek:
 
-### 2. Payroll `/payroll`
+- `src/modules/employees/pages/EmployeeList.js`
+
+Filter yang harus dipertahankan:
+
+- Search
+- Company
+- Rows / jumlah data per halaman
+
+### 3. Companies `/companies`
+
+File utama yang perlu dicek:
+
+- `src/modules/companies/pages/CompanyList.js`
+
+Filter yang harus dipertahankan:
+
+- Search
+- Status: semua status, active, nonaktif
+- Rows / jumlah data per halaman jika halaman sudah menyediakan pilihan rows
+
+### 4. Users `/users`
+
+File utama yang perlu dicek:
+
+- `src/modules/users/pages/UserList.js`
+
+Filter yang harus dipertahankan:
+
+- Search
+- Status: semua status, active, nonaktif
+- Rows / jumlah data per halaman jika halaman sudah menyediakan pilihan rows
+
+### 5. Components `/components`
+
+File utama yang perlu dicek:
+
+- `src/modules/components/pages/ComponentList.js`
+
+Filter yang harus dipertahankan:
+
+- Search
+- Tipe component
+- Status
+- Kategori
+
+### 6. Payroll `/payroll`
 
 File utama yang perlu dicek:
 
 - `src/modules/payroll/pages/PayrollList.js`
-- `src/modules/payroll/services/payrollService.js`
-- `src/utils/formatters.js`
 
-Flow yang wajib diubah field `Payroll Period`-nya menjadi date picker:
+Filter yang harus dipertahankan:
 
-1. Tombol `Generate Payroll`
-   - Modal generate payroll dari tombol utama.
-   - Field `Payroll Period` saat ini memakai text input.
-   - Saat submit, payload ke `payrollService.generatePayroll(...)` tetap memakai format `YYYYMM`.
+- Search
+- Company
+- Period
+- Rows / jumlah data per halaman jika halaman sudah menyediakan pilihan rows
 
-2. Tombol `Generate Mass Payroll`
-   - Modal mass generate payroll.
-   - Field `Payroll Period` diganti menjadi date picker.
-   - Saat submit, payload ke `payrollService.generateMassPayroll(...)` tetap memakai format `YYYYMM`.
+### 7. Attendance `/attendance`
 
-3. Tombol `Generate Mass Slip`
-   - Modal mass slip.
-   - Field `Payroll Period` diganti menjadi date picker.
-   - Saat submit, payload ke `payrollService.generateMassSlip(...)` tetap memakai format `YYYYMM`.
+File utama yang perlu dicek:
 
-4. Tombol `Download Payroll`
-   - Modal download payroll.
-   - Field `Payroll Period` diganti menjadi date picker.
-   - Saat download, parameter periode ke `payrollService.downloadPayroll(...)` tetap memakai format `YYYYMM`.
+- `src/modules/attendance/pages/AttendanceList.js`
 
-Perilaku default yang diharapkan:
+Filter yang harus dipertahankan:
 
-- Saat modal dibuka dari tombol utama, field `Payroll Period` default ke periode berjalan.
-- Jika modal ditutup lalu dibuka lagi, periode kembali ke periode berjalan kecuali ada alasan UX yang lebih tepat untuk mempertahankan input terakhir.
-- Untuk flow yang dibuka dari row payroll existing, jika periode row sudah tersedia, gunakan periode row tersebut sebagai nilai awal.
+- Search
+- Rows / jumlah data per halaman jika halaman sudah menyediakan pilihan rows
 
-Catatan scope:
+## Perilaku yang Diharapkan
 
-- Permintaan utama hanya mencakup `Generate Payroll`, `Generate Mass Payroll`, `Generate Mass Slip`, dan `Download Payroll`.
-- Jika implementer menemukan field periode lain di `/payroll`, seperti generate slip per row atau mass email, boleh dibuat konsisten memakai helper yang sama, tetapi jangan memperbesar scope jika tidak diperlukan.
-- Filter period di tabel payroll saat ini menggunakan dropdown period options. Tidak wajib diubah kecuali ada instruksi lanjutan.
+1. Ketika user mengubah filter di halaman list, nilai filter tersebut disimpan.
+2. Ketika user pindah ke halaman lain lalu kembali ke halaman list yang sama, filter terakhir otomatis terisi lagi.
+3. Data list yang dimuat mengikuti filter terakhir, bukan filter default.
+4. Filter setiap halaman harus terpisah. Contoh: filter `/employees` tidak boleh memengaruhi filter `/users`.
+5. Tombol reset atau clear filter tetap mengembalikan filter halaman tersebut ke default dan ikut memperbarui penyimpanan filter.
+6. Pagination sebaiknya kembali ke page pertama saat filter utama berubah, kecuali sudah ada behavior existing yang berbeda dan memang harus dipertahankan.
 
 ## Rekomendasi Pendekatan
 
-1. Buat helper konversi periode agar logic tidak tersebar:
-   - `payrollPeriodToPickerValue(period)` untuk `YYYYMM` menjadi `YYYY-MM`.
-   - `pickerValueToPayrollPeriod(value)` untuk `YYYY-MM` menjadi `YYYYMM`.
-   - `getCurrentPayrollPickerValue()` jika diperlukan untuk default date picker.
-2. Simpan state sesuai kebutuhan UI:
-   - Boleh menyimpan state dalam format picker `YYYY-MM`, lalu konversi saat submit.
-   - Atau tetap menyimpan format `YYYYMM`, lalu konversi saat render input. Pilih salah satu dan jaga konsistensi.
-3. Validasi tetap memastikan periode yang dikirim ke service adalah `YYYYMM`.
-4. Jangan mengubah `payrollService` jika service sudah menerima periode `YYYYMM` dengan benar.
-5. Pastikan loading/disabled state existing tetap berjalan saat request diproses.
-6. Update helper text di UI agar tidak lagi meminta user mengetik `YYYYMM`.
+Gunakan penyimpanan di sisi browser agar filter tetap ada selama user masih memakai aplikasi.
+
+Pilihan yang disarankan:
+
+- `sessionStorage` jika filter cukup bertahan selama tab browser masih terbuka.
+- `localStorage` jika filter perlu tetap ada walaupun browser/tab ditutup dan dibuka lagi.
+
+Rekomendasi awal: gunakan `sessionStorage`, karena kebutuhan yang disebutkan adalah meninggalkan halaman lalu kembali lagi dalam sesi penggunaan aplikasi.
+
+Buat key storage yang spesifik per halaman, misalnya:
+
+```text
+cms.payroll.filters.employees
+cms.payroll.filters.companies
+cms.payroll.filters.users
+cms.payroll.filters.components
+cms.payroll.filters.payroll
+cms.payroll.filters.attendance
+cms.payroll.filters.dashboard
+```
+
+Jika pola penyimpanan filter akan dipakai di banyak halaman, implementer boleh membuat helper/hook kecil agar logic baca/tulis storage tidak berulang. Tetap ikuti gaya kode existing di project.
+
+## Catatan Implementasi
+
+1. Baca filter dari storage saat inisialisasi state halaman.
+2. Validasi nilai dari storage sebelum dipakai, terutama untuk angka seperti `rows` atau `pageSize`.
+3. Simpan hanya data filter yang dibutuhkan, jangan simpan response API atau data list.
+4. Jangan menyimpan data sensitif.
+5. Pastikan nilai default tetap dipakai jika storage kosong, rusak, atau berisi format lama.
+6. Jika ada state input search dan state search yang sudah diterapkan, keduanya perlu diselaraskan agar input yang terlihat user sama dengan filter yang dipakai request.
+7. Jangan mengubah kontrak API backend kecuali ditemukan bug yang memang berasal dari backend.
 
 ## Acceptance Criteria
 
-1. Di `/dashboard`, field `Periode Mulai` dan `Periode Akhir` menggunakan date picker/periode picker, bukan text input manual.
-2. Di `/dashboard`, default `Periode Mulai` dan `Periode Akhir` adalah periode berjalan.
-3. Di `/dashboard`, request ke backend tetap mengirim `period_start` dan `period_end` dalam format `YYYYMM`.
-4. Di `/dashboard`, tombol `Reset` mengembalikan periode ke periode berjalan.
-5. Di `/payroll`, modal `Generate Payroll` memakai date picker untuk `Payroll Period`.
-6. Di `/payroll`, modal `Generate Mass Payroll` memakai date picker untuk `Payroll Period`.
-7. Di `/payroll`, modal `Generate Mass Slip` memakai date picker untuk `Payroll Period`.
-8. Di `/payroll`, modal `Download Payroll` memakai date picker untuk `Payroll Period`.
-9. Semua request payroll tetap mengirim periode dalam format `YYYYMM`.
-10. Error handling, loading state, disabled state, dan toast existing tetap berjalan seperti sebelumnya.
-11. Tidak ada perubahan kontrak backend yang tidak diperlukan.
+1. Di `/dashboard`, filter company, periode mulai, dan periode akhir tetap ada setelah user meninggalkan halaman lalu kembali.
+2. Di `/employees`, filter search, company, dan rows tetap ada setelah user meninggalkan halaman lalu kembali.
+3. Di `/companies`, filter search dan status tetap ada setelah user meninggalkan halaman lalu kembali.
+4. Di `/users`, filter search dan status tetap ada setelah user meninggalkan halaman lalu kembali.
+5. Di `/components`, filter search, tipe component, status, dan kategori tetap ada setelah user meninggalkan halaman lalu kembali.
+6. Di `/payroll`, filter search, company, dan period tetap ada setelah user meninggalkan halaman lalu kembali.
+7. Di `/attendance`, filter search tetap ada setelah user meninggalkan halaman lalu kembali.
+8. Reset filter pada masing-masing halaman mengembalikan nilai ke default dan filter lama tidak muncul lagi saat halaman dibuka kembali.
+9. Filter antar halaman tidak saling tertukar atau saling memengaruhi.
+10. Request data dashboard dan list tetap memakai parameter filter yang benar sesuai nilai terakhir.
+11. Loading state, error handling, pagination, dan tampilan existing tetap berjalan normal.
 
 ## Skenario Test
 
-Detail implementasi test tidak perlu dibuat terlalu rinci. Minimal skenario yang harus dicek:
+Detail unit test tidak perlu terlalu rinci. Minimal skenario yang harus dicek:
 
-1. Buka `/dashboard`, pastikan periode mulai dan akhir otomatis terisi periode berjalan.
-2. Ubah periode dashboard melalui date picker, klik `Terapkan`, pastikan data dashboard dimuat dengan periode yang dipilih.
-3. Klik `Reset` di dashboard, pastikan periode kembali ke periode berjalan.
-4. Buka modal `Generate Payroll`, pilih employee, pilih periode melalui date picker, lalu generate payroll.
-5. Buka modal `Generate Mass Payroll`, pilih periode melalui date picker, lalu jalankan mass generate.
-6. Buka modal `Generate Mass Slip`, pilih periode melalui date picker, lalu generate slip massal.
-7. Buka modal `Download Payroll`, pilih periode dan company, lalu download payroll.
-8. Pastikan periode yang diterima backend di semua flow tetap berbentuk `YYYYMM`.
-9. Pastikan validasi required tetap muncul jika periode belum dipilih.
-10. Pastikan UI tetap normal saat request loading dan setelah request selesai.
+1. Set filter company dan periode di `/dashboard`, pindah ke menu lain, lalu kembali ke `/dashboard`.
+2. Set filter di `/employees`, pindah ke halaman detail/form atau menu lain, lalu kembali ke `/employees`.
+3. Set filter status di `/companies`, pindah halaman, lalu kembali ke `/companies`.
+4. Set filter status di `/users`, pindah halaman, lalu kembali ke `/users`.
+5. Set kombinasi filter di `/components`, pindah halaman, lalu kembali ke `/components`.
+6. Set filter company dan period di `/payroll`, pindah halaman, lalu kembali ke `/payroll`.
+7. Set search di `/attendance`, pindah halaman, lalu kembali ke `/attendance`.
+8. Klik reset filter di setiap halaman yang terdampak, pindah halaman, lalu kembali dan pastikan filter tetap default.
+9. Pastikan filter `/dashboard` tidak muncul di `/employees`, `/companies`, `/users`, atau halaman lain.
+10. Refresh browser setelah filter disimpan dan pastikan behavior sesuai pilihan storage yang digunakan.
+11. Uji kondisi storage berisi data tidak valid dan pastikan halaman tetap memakai default tanpa crash.
 
-## Catatan untuk Implementer
+## Batasan Scope
 
-- Jangan mengirim format `YYYY-MM` ke backend.
-- Jangan mengubah endpoint backend hanya untuk kebutuhan date picker.
-- Jangan hardcode periode berjalan. Gunakan tanggal saat runtime.
-- Pastikan perubahan tetap mengikuti gaya komponen CoreUI yang sudah dipakai di project.
-- Jika memakai native `type="month"`, browser akan menampilkan picker bulan sesuai dukungan browser masing-masing.
+- Tidak perlu perubahan backend untuk requirement ini.
+- Tidak perlu redesign UI.
+- Tidak perlu membuat instruksi unit test terlalu detail; cukup pastikan skenario utama di atas tercakup.
+- Tidak perlu menyimpan data tabel, cukup simpan filter dan pilihan pagination yang relevan.

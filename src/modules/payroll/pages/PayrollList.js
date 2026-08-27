@@ -61,12 +61,35 @@ import payrollService from '../services/payrollService';
 import employeeService from '../../employees/services/employeeService';
 import companyService from '../../companies/services/companyService';
 import config from '../../../config/environment';
+import { readSessionFilter, writeSessionFilter, normalizePageSize } from '../../../utils/filterPersistence';
+
+const DEFAULT_PAYROLL_PAGE_SIZE = 15;
+const PAYROLL_FILTER_STORAGE_KEY = 'cms.payroll.filters.payroll';
 
 const createDefaultSearchParams = () => ({
   search: '',
   payroll_periode: pickerValueToPayrollPeriod(getCurrentPayrollPickerValue()),
   company_id: ''
 });
+
+const createDefaultPayrollFilters = () => ({
+  ...createDefaultSearchParams(),
+  pageSize: DEFAULT_PAYROLL_PAGE_SIZE
+});
+
+const readPayrollFilters = () =>
+  readSessionFilter(PAYROLL_FILTER_STORAGE_KEY, createDefaultPayrollFilters(), (filters, fallback) => {
+    const payrollPeriod = String(filters.payroll_periode || '');
+
+    return {
+      search: String(filters.search || ''),
+      payroll_periode: payrollPeriod === '' || /^\d{6}$/.test(payrollPeriod)
+        ? payrollPeriod
+        : fallback.payroll_periode,
+      company_id: String(filters.company_id || ''),
+      pageSize: normalizePageSize(filters.pageSize, fallback.pageSize)
+    };
+  });
 
 const getDefaultPayrollPickerValue = () => getCurrentPayrollPickerValue();
 
@@ -110,15 +133,24 @@ class PayrollListErrorBoundary extends React.Component {
 }
 
 const PayrollList = () => {
+  const persistedFilters = useMemo(() => readPayrollFilters(), []);
   const [payrolls, setPayrolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [pageSize, setPageSize] = useState(15); // Default to 15 rows per page
-  const [searchParams, setSearchParams] = useState(() => createDefaultSearchParams());
-  const [appliedSearchParams, setAppliedSearchParams] = useState(() => createDefaultSearchParams());
+  const [pageSize, setPageSize] = useState(() => persistedFilters.pageSize);
+  const [searchParams, setSearchParams] = useState(() => ({
+    search: persistedFilters.search,
+    payroll_periode: persistedFilters.payroll_periode,
+    company_id: persistedFilters.company_id
+  }));
+  const [appliedSearchParams, setAppliedSearchParams] = useState(() => ({
+    search: persistedFilters.search,
+    payroll_periode: persistedFilters.payroll_periode,
+    company_id: persistedFilters.company_id
+  }));
   const [hasLoadedPayrolls, setHasLoadedPayrolls] = useState(false);
   const [periodOptions, setPeriodOptions] = useState([]);
   const [periodOptionsLoading, setPeriodOptionsLoading] = useState(false);
@@ -327,19 +359,32 @@ const PayrollList = () => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setAppliedSearchParams({
+    const nextSearchParams = {
       search: searchParams.search.trim(),
       payroll_periode: searchParams.payroll_periode.trim(),
       company_id: String(searchParams.company_id || '').trim()
-    });
+    };
+
+    setSearchParams(nextSearchParams);
+    setAppliedSearchParams(nextSearchParams);
     setCurrentPage(1);
+    writeSessionFilter(PAYROLL_FILTER_STORAGE_KEY, {
+      ...nextSearchParams,
+      pageSize
+    });
   };
 
   const resetFilters = () => {
     const defaultParams = createDefaultSearchParams();
+    const defaultPageSize = DEFAULT_PAYROLL_PAGE_SIZE;
     setSearchParams(defaultParams);
     setAppliedSearchParams(defaultParams);
+    setPageSize(defaultPageSize);
     setCurrentPage(1);
+    writeSessionFilter(PAYROLL_FILTER_STORAGE_KEY, {
+      ...defaultParams,
+      pageSize: defaultPageSize
+    });
   };
 
   // Handle Generate Payroll
@@ -1075,6 +1120,10 @@ const PayrollList = () => {
   const handlePageSizeChange = (size) => {
     setPageSize(size);
     setCurrentPage(1); // Reset to first page when changing page size
+    writeSessionFilter(PAYROLL_FILTER_STORAGE_KEY, {
+      ...appliedSearchParams,
+      pageSize: size
+    });
   };
 
   if (loading && !hasLoadedPayrolls) {

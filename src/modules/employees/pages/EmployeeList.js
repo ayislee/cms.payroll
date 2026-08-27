@@ -60,6 +60,7 @@ import { PTKP_OPTIONS } from '../../../constants/payrollConstants';
 import employeeService from '../services/employeeService';
 import companyService from '../../companies/services/companyService';
 import config from '../../../config/environment';
+import { readSessionFilter, writeSessionFilter, normalizePageSize } from '../../../utils/filterPersistence';
 
 // Enhanced Search Styles
 const searchStyles = `
@@ -410,19 +411,35 @@ if (!document.getElementById('employee-search-styles')) {
   document.head.appendChild(styleElement);
 }
 
+const EMPLOYEE_FILTER_STORAGE_KEY = 'cms.payroll.filters.employees';
+
+const createDefaultEmployeeFilters = () => ({
+  search: '',
+  companyId: '',
+  rows: config.pagination.defaultRows
+});
+
+const readEmployeeFilters = () =>
+  readSessionFilter(EMPLOYEE_FILTER_STORAGE_KEY, createDefaultEmployeeFilters(), (filters, fallback) => ({
+    search: String(filters.search || ''),
+    companyId: String(filters.companyId || ''),
+    rows: normalizePageSize(filters.rows, fallback.rows, config.pagination.pageSizeOptions)
+  }));
+
 const EmployeeList = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   
   // Set document title
   useDocumentTitle('Employee Management');
+  const persistedFiltersRef = useRef(readEmployeeFilters());
 
   // State management
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => persistedFiltersRef.current.search);
+  const [searchInput, setSearchInput] = useState(() => persistedFiltersRef.current.search);
   const [isSearching, setIsSearching] = useState(false);
   const [searchHistory, setSearchHistory] = useState([]);
   const [showSearchHistory, setShowSearchHistory] = useState(false);
@@ -431,12 +448,12 @@ const EmployeeList = () => {
   const [companyOptions, setCompanyOptions] = useState([]);
   const [companyOptionsLoading, setCompanyOptionsLoading] = useState(false);
   const [companyFilterError, setCompanyFilterError] = useState('');
-  const [selectedCompanyId, setSelectedCompanyId] = useState('');
+  const [selectedCompanyId, setSelectedCompanyId] = useState(() => persistedFiltersRef.current.companyId);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [actualTotalEmployees, setActualTotalEmployees] = useState(0);
-  const [rows, setRows] = useState(config.pagination.defaultRows);
+  const [rows, setRows] = useState(() => persistedFiltersRef.current.rows);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -611,7 +628,14 @@ const EmployeeList = () => {
 
   // Initial load
   useEffect(() => {
-    loadEmployees(1, '', true, config.pagination.defaultRows, '');
+    const persistedFilters = persistedFiltersRef.current;
+    loadEmployees(
+      1,
+      persistedFilters.search,
+      true,
+      persistedFilters.rows,
+      persistedFilters.companyId
+    );
   }, [loadEmployees]);
 
   const loadActualTotalEmployees = useCallback(async (companyId = '') => {
@@ -754,6 +778,11 @@ const EmployeeList = () => {
       });
     }
 
+    writeSessionFilter(EMPLOYEE_FILTER_STORAGE_KEY, {
+      search: trimmed,
+      companyId: selectedCompanyId,
+      rows
+    });
     loadEmployees(1, trimmed, true, rows, selectedCompanyId);
   }, [loadEmployees, rows, selectedCompanyId, trimmedSearchInput]);
 
@@ -776,21 +805,29 @@ const EmployeeList = () => {
         return [trimmed, ...filtered].slice(0, 10);
       });
 
+      writeSessionFilter(EMPLOYEE_FILTER_STORAGE_KEY, {
+        search: trimmed,
+        companyId: selectedCompanyId,
+        rows
+      });
       loadEmployees(1, trimmed, true, rows, selectedCompanyId);
     },
     [loadEmployees, rows, selectedCompanyId]
   );
 
   const handleResetSearch = useCallback(() => {
+    const defaultFilters = createDefaultEmployeeFilters();
     setSearchInput('');
     setSearchTerm('');
     setSelectedCompanyId('');
+    setRows(defaultFilters.rows);
     setCurrentPage(1);
     setShowSuggestions(false);
     setSearchSuggestions([]);
     setShowSearchHistory(false);
 
-    loadEmployees(1, '', true, rows, '');
+    writeSessionFilter(EMPLOYEE_FILTER_STORAGE_KEY, defaultFilters);
+    loadEmployees(1, '', true, defaultFilters.rows, '');
   }, [loadEmployees, rows]);
 
   const clearSearchHistory = useCallback(() => {
@@ -807,6 +844,11 @@ const EmployeeList = () => {
       setCurrentPage(1);
       setShowSuggestions(false);
 
+      writeSessionFilter(EMPLOYEE_FILTER_STORAGE_KEY, {
+        search: trimmed,
+        companyId: selectedCompanyId,
+        rows
+      });
       loadEmployees(1, trimmed, true, rows, selectedCompanyId);
     },
     [loadEmployees, rows, selectedCompanyId]
@@ -821,6 +863,11 @@ const EmployeeList = () => {
       setShowSuggestions(false);
       setShowSearchHistory(false);
 
+      writeSessionFilter(EMPLOYEE_FILTER_STORAGE_KEY, {
+        search: searchTerm,
+        companyId,
+        rows
+      });
       loadEmployees(1, searchTerm, true, rows, companyId);
     },
     [loadEmployees, rows, searchTerm]
@@ -845,6 +892,11 @@ const EmployeeList = () => {
         clearTimeout(searchDebounceRef.current);
       }
 
+      writeSessionFilter(EMPLOYEE_FILTER_STORAGE_KEY, {
+        search: searchTerm,
+        companyId: selectedCompanyId,
+        rows: newRows
+      });
       loadEmployees(1, searchTerm, true, newRows, selectedCompanyId);
     },
     [loadEmployees, searchTerm, selectedCompanyId]

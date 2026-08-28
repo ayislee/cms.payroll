@@ -80,7 +80,19 @@ class AttendanceService {
 
   async syncExternal(payload) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.ATTENDANCE.SYNC_EXTERNAL, payload);
+      const requestedPeriod = String(
+        payload?.payroll_period ?? payload?.payroll_periode ?? ''
+      ).trim();
+      const payrollPeriod = requestedPeriod.replace(/^(\d{4})-(\d{2})$/, '$1$2');
+
+      if (!/^\d{4}(0[1-9]|1[0-2])$/.test(payrollPeriod)) {
+        throw new Error('Payroll period must use YYYYMM format.');
+      }
+
+      const response = await apiClient.post(API_ENDPOINTS.ATTENDANCE.SYNC_EXTERNAL, {
+        ...payload,
+        payroll_period: payrollPeriod
+      });
       return response?.data;
     } catch (error) {
       throw this.handleError(error);

@@ -53,7 +53,12 @@ import {
   cilLoopCircular
 } from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
-import { formatPayrollPeriod, formatDate as formatDisplayDate } from '../../../utils/formatters';
+import {
+  formatPayrollPeriod,
+  formatDate as formatDisplayDate,
+  payrollPeriodToPickerValue,
+  pickerValueToPayrollPeriod
+} from '../../../utils/formatters';
 import attendanceService from '../services/attendanceService';
 import employeeService from '../../employees/services/employeeService';
 import { readSessionFilter, writeSessionFilter, normalizePageSize } from '../../../utils/filterPersistence';
@@ -277,7 +282,7 @@ const AttendanceList = () => {
       (filters.payroll_periode || '').trim() ||
       (appliedFilters.payroll_periode || '').trim();
 
-    setSyncPeriod(defaultPeriod);
+    setSyncPeriod(payrollPeriodToPickerValue(defaultPeriod));
     setSyncError('');
     setShowSyncModal(true);
     setShowSyncConfirm(false);
@@ -299,15 +304,15 @@ const AttendanceList = () => {
       return;
     }
 
-    const trimmedPeriod = syncPeriod.trim();
+    const trimmedPeriod = pickerValueToPayrollPeriod(syncPeriod);
 
     if (!trimmedPeriod) {
       setSyncError('Payroll period is required.');
       return;
     }
 
-    if (!/^\d{6}$/.test(trimmedPeriod)) {
-      setSyncError('Payroll period must follow the YYYYMM format (e.g., 202509).');
+    if (!trimmedPeriod) {
+      setSyncError('Please select a payroll period.');
       return;
     }
 
@@ -324,7 +329,7 @@ const AttendanceList = () => {
 
     setShowSyncConfirm(false);
     if (pendingSyncPeriod) {
-      setSyncPeriod(pendingSyncPeriod);
+      setSyncPeriod(payrollPeriodToPickerValue(pendingSyncPeriod));
     }
     setSyncError('');
     setPendingSyncPeriod('');
@@ -352,7 +357,7 @@ const AttendanceList = () => {
     } catch (error) {
       console.error('Error syncing attendance:', error);
       setSyncError(error.message || 'Failed to synchronize attendance.');
-      setSyncPeriod(period);
+      setSyncPeriod(payrollPeriodToPickerValue(period));
       setPendingSyncPeriod('');
       setShowSyncConfirm(false);
       setShowSyncModal(true);
@@ -1221,15 +1226,14 @@ const AttendanceList = () => {
                   <CFormLabel htmlFor="attendance-sync-period">Payroll Period</CFormLabel>
                   <CFormInput
                     id="attendance-sync-period"
-                    type="text"
+                    type="month"
                     value={syncPeriod}
                     onChange={(e) => setSyncPeriod(e.target.value)}
-                    placeholder="Enter period (e.g., 202509)"
                     disabled={syncLoading}
                     autoComplete="off"
                   />
                   <div className="small text-medium-emphasis mt-1">
-                    Provide the payroll period in YYYYMM format that you want to synchronize from the external system.
+                    Select the payroll month that you want to synchronize from the external system.
                   </div>
                 </div>
               </CModalBody>

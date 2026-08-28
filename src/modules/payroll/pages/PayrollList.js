@@ -1525,14 +1525,14 @@ const PayrollList = () => {
                                     <CIcon icon={cilEnvelopeClosed} size="sm" />
                                   )}
                                 </CButton>
-                                <CButton
+                                {/* <CButton
                                   color="danger"
                                   size="sm"
                                   title="Delete payroll (coming soon)"
                                   disabled
                                 >
                                   <CIcon icon={cilTrash} size="sm" />
-                                </CButton>
+                                </CButton> */}
                               </div>
                             </CTableDataCell>
                           </CTableRow>

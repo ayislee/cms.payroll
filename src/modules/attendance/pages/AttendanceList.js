@@ -1044,6 +1044,8 @@ const AttendanceList = () => {
                     <CTableRow>
                       <CTableHeaderCell>Employee</CTableHeaderCell>
                       <CTableHeaderCell>Period</CTableHeaderCell>
+                      <CTableHeaderCell>Cutoff</CTableHeaderCell>
+                      <CTableHeaderCell>Overtime</CTableHeaderCell>
                       <CTableHeaderCell>Scheduled Days</CTableHeaderCell>
                       <CTableHeaderCell>Actual Days</CTableHeaderCell>
                       <CTableHeaderCell>Absent Days</CTableHeaderCell>
@@ -1077,6 +1079,21 @@ const AttendanceList = () => {
                           <CTableDataCell>
                             <div className="fw-semibold">{periodLabel.formatted}</div>
                             <div className="small text-medium-emphasis">{periodLabel.raw}</div>
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            <div className="small">
+                              {attendance.cutoff_start_date && attendance.cutoff_end_date
+                                ? `${formatDisplayDate(attendance.cutoff_start_date)} - ${formatDisplayDate(attendance.cutoff_end_date)}`
+                                : '-'}
+                            </div>
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            <div className="small">
+                              {Number(attendance.overtime_work_days) || 0} work days
+                            </div>
+                            <div className="small text-medium-emphasis">
+                              {Number(attendance.overtime_hours) || 0}h {Number(attendance.overtime_minutes) || 0}m
+                            </div>
                           </CTableDataCell>
                           <CTableDataCell>
                             <div className="fw-semibold">{scheduledDays.toLocaleString('id-ID')}</div>

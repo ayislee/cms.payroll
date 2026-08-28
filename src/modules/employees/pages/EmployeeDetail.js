@@ -755,6 +755,16 @@ const EmployeeDetail = () => {
                               </CListGroupItem>
 
                               <CListGroupItem className="d-flex justify-content-between align-items-start">
+                                <div>
+                                  <strong>Resign Date</strong>
+                                  <div className="text-medium-emphasis small">Date employment ended</div>
+                                </div>
+                                <div className="text-end fw-semibold">
+                                  {employee.resign_date ? formatDate(employee.resign_date) : <span className="text-muted">-</span>}
+                                </div>
+                              </CListGroupItem>
+
+                              <CListGroupItem className="d-flex justify-content-between align-items-start">
                                 <div className="d-flex align-items-center">
                                   <CIcon icon={cilCalendar} className="me-2" />
                                   <div>

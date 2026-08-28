@@ -63,6 +63,7 @@ const EmployeeForm = () => {
     job_position: '',
     grade: '',
     organization: '',
+    resign_date: '',
     rekening: '',
     bank: '',
     cabang: '',
@@ -172,6 +173,7 @@ const EmployeeForm = () => {
             job_position: employee.job_position || '',
             grade: employee.grade || '',
             organization: employee.organization || '',
+            resign_date: employee.resign_date || '',
             rekening: employee.rekening || '',
             bank: employee.bank || '',
             cabang: employee.cabang || '',
@@ -577,6 +579,19 @@ const EmployeeForm = () => {
                         value={formData.organization}
                         onChange={handleInputChange}
                         placeholder="e.g., Finance Division"
+                      />
+                    </div>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="mb-3">
+                      <CFormLabel htmlFor="resign_date">Resign Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        id="resign_date"
+                        name="resign_date"
+                        value={formData.resign_date}
+                        onChange={handleInputChange}
                       />
                     </div>
                   </CCol>

@@ -117,7 +117,13 @@ const AttendanceList = () => {
     payroll_periode: '',
     total_working_days: '',
     absent_days: '',
-    actual_working_days: ''
+    actual_working_days: '',
+    overtime_hour_days: '',
+    overtime_hours: '',
+    overtime_minutes: '',
+    overtime_work_days: '',
+    cutoff_start_date: '',
+    cutoff_end_date: ''
   };
   const [showAddModal, setShowAddModal] = useState(false);
   const [addFormData, setAddFormData] = useState(initialFormState);
@@ -555,7 +561,13 @@ const AttendanceList = () => {
       payroll_periode: attendance.payroll_periode?.toString() || '',
       total_working_days: attendance.total_working_days?.toString() || '',
       absent_days: attendance.absent_days?.toString() || '',
-      actual_working_days: attendance.actual_working_days?.toString() || ''
+      actual_working_days: attendance.actual_working_days?.toString() || '',
+      overtime_hour_days: attendance.overtime_hour_days?.toString() || '0',
+      overtime_hours: attendance.overtime_hours?.toString() || '0',
+      overtime_minutes: attendance.overtime_minutes?.toString() || '0',
+      overtime_work_days: attendance.overtime_work_days?.toString() || '0',
+      cutoff_start_date: attendance.cutoff_start_date?.toString() || '',
+      cutoff_end_date: attendance.cutoff_end_date?.toString() || ''
     });
     setShowAddModal(true);
   };
@@ -564,7 +576,16 @@ const AttendanceList = () => {
     const { name, value } = event.target;
     let sanitizedValue = value;
 
-    if (['employee_id', 'total_working_days', 'absent_days', 'actual_working_days'].includes(name)) {
+    if ([
+      'employee_id',
+      'total_working_days',
+      'absent_days',
+      'actual_working_days',
+      'overtime_hour_days',
+      'overtime_hours',
+      'overtime_minutes',
+      'overtime_work_days'
+    ].includes(name)) {
       sanitizedValue = value.replace(/[^0-9]/g, '');
     }
 
@@ -753,6 +774,34 @@ const AttendanceList = () => {
       }
     }
 
+    const overtimeFields = [
+      'overtime_hour_days',
+      'overtime_hours',
+      'overtime_minutes',
+      'overtime_work_days'
+    ];
+    overtimeFields.forEach((field) => {
+      if (addFormData[field] !== '' && (Number.isNaN(Number(addFormData[field])) || Number(addFormData[field]) < 0)) {
+        errors[field] = 'Nilai overtime tidak boleh negatif';
+      }
+    });
+
+    if (addFormData.cutoff_start_date && Number.isNaN(new Date(addFormData.cutoff_start_date).getTime())) {
+      errors.cutoff_start_date = 'Tanggal cutoff mulai tidak valid';
+    }
+    if (addFormData.cutoff_end_date && Number.isNaN(new Date(addFormData.cutoff_end_date).getTime())) {
+      errors.cutoff_end_date = 'Tanggal cutoff selesai tidak valid';
+    }
+    if (
+      !errors.cutoff_start_date &&
+      !errors.cutoff_end_date &&
+      addFormData.cutoff_start_date &&
+      addFormData.cutoff_end_date &&
+      addFormData.cutoff_end_date < addFormData.cutoff_start_date
+    ) {
+      errors.cutoff_end_date = 'Tanggal cutoff selesai tidak boleh sebelum tanggal mulai';
+    }
+
     return errors;
   };
 
@@ -772,7 +821,13 @@ const AttendanceList = () => {
       payroll_periode: addFormData.payroll_periode,
       total_working_days: Number(addFormData.total_working_days),
       actual_working_days: Number(addFormData.actual_working_days),
-      absent_days: Number(addFormData.absent_days)
+      absent_days: Number(addFormData.absent_days),
+      overtime_hour_days: Number(addFormData.overtime_hour_days || 0),
+      overtime_hours: Number(addFormData.overtime_hours || 0),
+      overtime_minutes: Number(addFormData.overtime_minutes || 0),
+      overtime_work_days: Number(addFormData.overtime_work_days || 0),
+      cutoff_start_date: addFormData.cutoff_start_date || null,
+      cutoff_end_date: addFormData.cutoff_end_date || null
     };
 
     if (isEditMode && currentAttendanceId) {
@@ -1442,6 +1497,92 @@ const AttendanceList = () => {
                   {formErrors.actual_working_days && (
                     <CFormFeedback invalid>{formErrors.actual_working_days}</CFormFeedback>
                   )}
+                </div>
+                <div className="border-top pt-3 mt-3">
+                  <h6>Overtime</h6>
+                  <CRow className="g-3">
+                    <CCol md={6}>
+                      <CFormLabel htmlFor="attendance-overtime-hour-days">Hari Lembur Berbasis Jam</CFormLabel>
+                      <CFormInput
+                        id="attendance-overtime-hour-days"
+                        name="overtime_hour_days"
+                        type="number"
+                        min="0"
+                        value={addFormData.overtime_hour_days}
+                        onChange={handleAddInputChange}
+                        invalid={!!formErrors.overtime_hour_days}
+                      />
+                      {formErrors.overtime_hour_days && <CFormFeedback invalid>{formErrors.overtime_hour_days}</CFormFeedback>}
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormLabel htmlFor="attendance-overtime-work-days">Hari Kerja Lembur</CFormLabel>
+                      <CFormInput
+                        id="attendance-overtime-work-days"
+                        name="overtime_work_days"
+                        type="number"
+                        min="0"
+                        value={addFormData.overtime_work_days}
+                        onChange={handleAddInputChange}
+                        invalid={!!formErrors.overtime_work_days}
+                      />
+                      {formErrors.overtime_work_days && <CFormFeedback invalid>{formErrors.overtime_work_days}</CFormFeedback>}
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormLabel htmlFor="attendance-overtime-hours">Total Jam Lembur</CFormLabel>
+                      <CFormInput
+                        id="attendance-overtime-hours"
+                        name="overtime_hours"
+                        type="number"
+                        min="0"
+                        value={addFormData.overtime_hours}
+                        onChange={handleAddInputChange}
+                        invalid={!!formErrors.overtime_hours}
+                      />
+                      {formErrors.overtime_hours && <CFormFeedback invalid>{formErrors.overtime_hours}</CFormFeedback>}
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormLabel htmlFor="attendance-overtime-minutes">Menit Lembur</CFormLabel>
+                      <CFormInput
+                        id="attendance-overtime-minutes"
+                        name="overtime_minutes"
+                        type="number"
+                        min="0"
+                        value={addFormData.overtime_minutes}
+                        onChange={handleAddInputChange}
+                        invalid={!!formErrors.overtime_minutes}
+                      />
+                      {formErrors.overtime_minutes && <CFormFeedback invalid>{formErrors.overtime_minutes}</CFormFeedback>}
+                    </CCol>
+                  </CRow>
+                </div>
+                <div className="border-top pt-3 mt-3">
+                  <h6>Periode Cutoff</h6>
+                  <CRow className="g-3">
+                    <CCol md={6}>
+                      <CFormLabel htmlFor="attendance-cutoff-start">Tanggal Mulai Cutoff</CFormLabel>
+                      <CFormInput
+                        id="attendance-cutoff-start"
+                        name="cutoff_start_date"
+                        type="date"
+                        value={addFormData.cutoff_start_date}
+                        onChange={handleAddInputChange}
+                        invalid={!!formErrors.cutoff_start_date}
+                      />
+                      {formErrors.cutoff_start_date && <CFormFeedback invalid>{formErrors.cutoff_start_date}</CFormFeedback>}
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormLabel htmlFor="attendance-cutoff-end">Tanggal Selesai Cutoff</CFormLabel>
+                      <CFormInput
+                        id="attendance-cutoff-end"
+                        name="cutoff_end_date"
+                        type="date"
+                        value={addFormData.cutoff_end_date}
+                        onChange={handleAddInputChange}
+                        invalid={!!formErrors.cutoff_end_date}
+                      />
+                      {formErrors.cutoff_end_date && <CFormFeedback invalid>{formErrors.cutoff_end_date}</CFormFeedback>}
+                    </CCol>
+                  </CRow>
                 </div>
               </CModalBody>
               <CModalFooter>

@@ -3,7 +3,7 @@
 // ========================================
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   CRow,
   CCol,
@@ -19,18 +19,27 @@ import {
   CTableRow,
   CTableHeaderCell,
   CTableDataCell,
-  CBadge
+  CBadge,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilArrowLeft, cilPrint, cilMoney, cilCloudDownload } from '@coreui/icons';
+import { cilArrowLeft, cilPrint, cilMoney, cilCloudDownload, cilTrash } from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import payrollService from '../services/payrollService';
 
 const PayrollDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [payroll, setPayroll] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   
   useDocumentTitle('Payroll Detail');
 
@@ -106,6 +115,39 @@ const PayrollDetail = () => {
       return <CBadge color="success">Emailed</CBadge>;
     } else {
       return <CBadge color="secondary">Needs Check</CBadge>;
+    }
+  };
+
+  const canDeletePayroll = (payrollData) =>
+    !Boolean(payrollData?.is_printed) &&
+    !Boolean(payrollData?.is_emailed) &&
+    !Boolean(payrollData?.is_posted);
+
+  const getDeletePayrollDisabledReason = (payrollData) => {
+    if (payrollData?.is_printed) return 'Payroll already checked and cannot be deleted';
+    if (payrollData?.is_emailed) return 'Payroll already emailed and cannot be deleted';
+    if (payrollData?.is_posted) return 'Payroll already posted and cannot be deleted';
+    return '';
+  };
+
+  const handleDeletePayroll = async () => {
+    if (!payroll?.payroll?.payroll_id) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setDeleteError('');
+
+      await payrollService.deletePayroll(payroll.payroll.payroll_id);
+      setShowDeleteModal(false);
+      window.alert('Payroll deleted successfully');
+      navigate('/payroll');
+    } catch (deleteError) {
+      console.error('Error deleting payroll:', deleteError);
+      setDeleteError(deleteError.message || 'Failed to delete payroll.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -192,6 +234,32 @@ const PayrollDetail = () => {
   return (
     <CRow>
       <CCol xs={12}>
+        <CModal visible={showDeleteModal} onClose={() => setShowDeleteModal(false)} alignment="center">
+          <CModalHeader>
+            <CModalTitle>Delete Payroll</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <p className="mb-2">
+              Are you sure you want to delete payroll <strong>#{payroll.payroll.payroll_id}</strong> for <strong>{payroll.payroll.employee.name}</strong>?
+            </p>
+            <p className="mb-0 text-medium-emphasis">
+              This will also delete the payroll details and benefits associated with this payroll.
+            </p>
+            {deleteError && (
+              <CAlert color="danger" className="mt-3 mb-0">{deleteError}</CAlert>
+            )}
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" variant="outline" onClick={() => setShowDeleteModal(false)} disabled={deleting}>
+              Cancel
+            </CButton>
+            <CButton color="danger" onClick={handleDeletePayroll} disabled={deleting}>
+              {deleting ? <CSpinner size="sm" className="me-2" /> : null}
+              Delete
+            </CButton>
+          </CModalFooter>
+        </CModal>
+
         <CCard className="mb-4">
           <CCardHeader>
             <CRow className="align-items-center">
@@ -201,12 +269,11 @@ const PayrollDetail = () => {
                   Payroll ID: #{payroll.payroll.payroll_id} | Period: {payroll.payroll.payroll_periode}
                 </small>
               </CCol>
-              <CCol xs="auto">
+              <CCol xs="auto" className="d-flex flex-wrap gap-2">
                 {slipUrl && (
                   <CButton
                     color="primary"
                     variant="outline"
-                    className="me-2"
                     component="a"
                     href={slipUrl}
                     target="_blank"
@@ -216,13 +283,27 @@ const PayrollDetail = () => {
                     Download Slip
                   </CButton>
                 )}
-                <CButton color="secondary" variant="outline" className="me-2">
+                <CButton color="secondary" variant="outline">
                   <CIcon icon={cilPrint} className="me-1" />
                   Print
                 </CButton>
                 <CButton color="info" variant="outline">
                   <CIcon icon={cilMoney} className="me-1" />
                   Email
+                </CButton>
+                <CButton
+                  color="danger"
+                  variant="outline"
+                  disabled={!canDeletePayroll(payroll.payroll) || deleting}
+                  title={
+                    canDeletePayroll(payroll.payroll)
+                      ? 'Delete payroll'
+                      : getDeletePayrollDisabledReason(payroll.payroll)
+                  }
+                  onClick={() => setShowDeleteModal(true)}
+                >
+                  {deleting ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilTrash} className="me-1" />}
+                  Delete
                 </CButton>
               </CCol>
             </CRow>

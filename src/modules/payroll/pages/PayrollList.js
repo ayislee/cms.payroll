@@ -175,6 +175,10 @@ const PayrollList = () => {
   const [massCheckError, setMassCheckError] = useState('');
   const [massChecking, setMassChecking] = useState(false);
   const [selectedPayrollIds, setSelectedPayrollIds] = useState([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [payrollToDelete, setPayrollToDelete] = useState(null);
+  const [deletingPayrollId, setDeletingPayrollId] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
   
   // Toast Notification State
   const [toast, setToast] = useState({
@@ -279,6 +283,13 @@ const PayrollList = () => {
   const canReopenPayroll = (payroll) => Boolean(payroll?.is_printed) && !Boolean(payroll?.is_emailed);
   const canCheckPayroll = (payroll) => Boolean(payroll?.slip_url) && !Boolean(payroll?.is_printed);
   const canSelectPayrollForMassCheck = (payroll) => canCheckPayroll(payroll) && !Boolean(payroll?.is_emailed);
+  const canDeletePayroll = (payroll) => !Boolean(payroll?.is_printed) && !Boolean(payroll?.is_emailed) && !Boolean(payroll?.is_posted);
+  const getDeletePayrollDisabledReason = (payroll) => {
+    if (payroll?.is_printed) return 'Payroll already checked and cannot be deleted';
+    if (payroll?.is_emailed) return 'Payroll already emailed and cannot be deleted';
+    if (payroll?.is_posted) return 'Payroll already posted and cannot be deleted';
+    return '';
+  };
   const selectedEligiblePayrolls = payrolls.filter((payroll) => selectedPayrollIds.includes(payroll.payroll_id));
   const allEligiblePayrollIds = payrolls
     .filter((payroll) => canSelectPayrollForMassCheck(payroll))
@@ -1062,6 +1073,41 @@ const PayrollList = () => {
     }
   };
 
+  const openDeletePayrollModal = (payroll) => {
+    setPayrollToDelete(payroll);
+    setDeleteError('');
+    setShowDeleteModal(true);
+  };
+
+  const closeDeletePayrollModal = () => {
+    setShowDeleteModal(false);
+    setPayrollToDelete(null);
+    setDeleteError('');
+  };
+
+  const handleDeletePayroll = async () => {
+    if (!payrollToDelete?.payroll_id) {
+      return;
+    }
+
+    try {
+      setDeletingPayrollId(payrollToDelete.payroll_id);
+      setDeleteError('');
+
+      await payrollService.deletePayroll(payrollToDelete.payroll_id);
+
+      closeDeletePayrollModal();
+      showToast('Payroll deleted successfully.', 'success');
+      await loadPayrolls();
+    } catch (error) {
+      console.error('Error deleting payroll:', error);
+      setDeleteError(error.message || 'Failed to delete payroll.');
+      showToast(error.message || 'Failed to delete payroll.', 'danger');
+    } finally {
+      setDeletingPayrollId(null);
+    }
+  };
+
   // Show toast notification
   const showToast = (message, color = 'success') => {
     setToast({
@@ -1150,6 +1196,39 @@ const PayrollList = () => {
     <PayrollListErrorBoundary>
       <CRow>
         <CCol xs={12}>
+          <CModal visible={showDeleteModal} onClose={closeDeletePayrollModal} alignment="center">
+            <CModalHeader>
+              <CModalTitle>Delete Payroll</CModalTitle>
+            </CModalHeader>
+            <CModalBody>
+              {payrollToDelete ? (
+                <>
+                  <p className="mb-2">
+                    Are you sure you want to delete payroll for <strong>{payrollToDelete.employee?.name || 'this employee'}</strong>?
+                  </p>
+                  <p className="mb-2 text-medium-emphasis">
+                    Period: <strong>{resolvePeriodLabel(payrollToDelete.payroll_periode).formatted}</strong>
+                  </p>
+                  <p className="mb-0 text-medium-emphasis">
+                    This will also delete payroll details and benefits associated with this record.
+                  </p>
+                </>
+              ) : null}
+              {deleteError && (
+                <CAlert color="danger" className="mt-3 mb-0">{deleteError}</CAlert>
+              )}
+            </CModalBody>
+            <CModalFooter>
+              <CButton color="secondary" variant="outline" onClick={closeDeletePayrollModal} disabled={deletingPayrollId !== null}>
+                Cancel
+              </CButton>
+              <CButton color="danger" onClick={handleDeletePayroll} disabled={deletingPayrollId !== null}>
+                {deletingPayrollId !== null ? <CSpinner size="sm" className="me-2" /> : null}
+                Delete
+              </CButton>
+            </CModalFooter>
+          </CModal>
+
           <CCard className="mb-4">
             <CCardHeader className="bg-white border-bottom-0 pb-0">
               <div className="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
@@ -1525,14 +1604,23 @@ const PayrollList = () => {
                                     <CIcon icon={cilEnvelopeClosed} size="sm" />
                                   )}
                                 </CButton>
-                                {/* <CButton
+                                <CButton
                                   color="danger"
                                   size="sm"
-                                  title="Delete payroll (coming soon)"
-                                  disabled
+                                  title={
+                                    canDeletePayroll(payroll)
+                                      ? 'Delete payroll'
+                                      : getDeletePayrollDisabledReason(payroll)
+                                  }
+                                  disabled={!canDeletePayroll(payroll) || deletingPayrollId === payroll.payroll_id}
+                                  onClick={() => openDeletePayrollModal(payroll)}
                                 >
-                                  <CIcon icon={cilTrash} size="sm" />
-                                </CButton> */}
+                                  {deletingPayrollId === payroll.payroll_id ? (
+                                    <CSpinner size="sm" />
+                                  ) : (
+                                    <CIcon icon={cilTrash} size="sm" />
+                                  )}
+                                </CButton>
                               </div>
                             </CTableDataCell>
                           </CTableRow>

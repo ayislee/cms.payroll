@@ -243,6 +243,27 @@ const CALCULATION_FORMULAS = [
     ],
   },
   {
+    value: 'overtime',
+    label: 'Overtime',
+    defaultParams: {
+      overtime_type: 'work_day',
+    },
+    fields: [
+      {
+        name: 'overtime_type',
+        label: 'Overtime Type',
+        type: 'select',
+        required: true,
+        helpText:
+          'Pilih basis perhitungan lembur: Work Day menghitung dari total hari lembur, Hours menghitung dari total jam lembur.',
+        options: [
+          { value: 'work_day', label: 'Work Day' },
+          { value: 'hours', label: 'Hours' },
+        ],
+      },
+    ],
+  },
+  {
     value: 'sampling_incentive_calculation',
     label: 'Sampling Incentive',
     defaultParams: {

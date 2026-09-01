@@ -265,10 +265,6 @@ const EmployeeDetail = () => {
 
   // Handle component edit
   const handleEditComponent = (component) => {
-    if (isAutomaticComponent(component)) {
-      return;
-    }
-
     setEditingComponent(component.employee_component_id);
     setComponentForm({
       amount: component.amount || 0,
@@ -1109,7 +1105,7 @@ const EmployeeDetail = () => {
                                             </CBadge>
                                           </CTableDataCell>
                                           <CTableDataCell>
-                                            {editingComponent === component.employee_component_id && !isAutomaticComponent(component) ? (
+                                            {editingComponent === component.employee_component_id ? (
                                               <CFormInput
                                                 type="number"
                                                 value={componentForm.amount}
@@ -1153,7 +1149,7 @@ const EmployeeDetail = () => {
                                             </div>
                                           </CTableDataCell>
                                           <CTableDataCell>
-                                            {editingComponent === component.employee_component_id && !isAutomaticComponent(component) ? (
+                                            {editingComponent === component.employee_component_id ? (
                                               <div className="d-flex gap-1">
                                                 <CButton 
                                                   color="success" 
@@ -1174,12 +1170,7 @@ const EmployeeDetail = () => {
                                               <CButton 
                                                 color="primary" 
                                                 size="sm"
-                                                disabled={isAutomaticComponent(component)}
-                                                title={
-                                                  isAutomaticComponent(component)
-                                                    ? 'Automatic calculation components cannot be edited'
-                                                    : 'Edit component'
-                                                }
+                                                title="Edit component"
                                                 onClick={() => handleEditComponent(component)}
                                               >
                                                 <CIcon icon={cilPencil} size="sm" />

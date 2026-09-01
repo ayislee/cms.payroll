@@ -92,6 +92,31 @@ const readAttendanceFilters = () =>
     };
   });
 
+const normalizeDateInputValue = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return '';
+  }
+
+  const stringValue = String(value).trim();
+
+  if (!stringValue) {
+    return '';
+  }
+
+  const normalizedDate = stringValue.includes('T') || stringValue.includes(' ')
+    ? new Date(stringValue)
+    : new Date(`${stringValue}T00:00:00`);
+
+  if (Number.isNaN(normalizedDate.getTime())) {
+    return stringValue.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(stringValue)
+      ? stringValue.slice(0, 10)
+      : stringValue;
+  }
+
+  const localDate = new Date(normalizedDate.getTime() - (normalizedDate.getTimezoneOffset() * 60000));
+  return localDate.toISOString().slice(0, 10);
+};
+
 const AttendanceList = () => {
   const persistedFilters = useMemo(() => readAttendanceFilters(), []);
   const [attendances, setAttendances] = useState([]);
@@ -560,14 +585,14 @@ const AttendanceList = () => {
       employee_id: attendance.employee_id?.toString() || '',
       payroll_periode: attendance.payroll_periode?.toString() || '',
       total_working_days: attendance.total_working_days?.toString() || '',
-      absent_days: attendance.absent_days?.toString() || '',
+      absent_days: attendance.absent_days == null ? '0' : attendance.absent_days.toString(),
       actual_working_days: attendance.actual_working_days?.toString() || '',
       overtime_hour_days: attendance.overtime_hour_days?.toString() || '0',
       overtime_hours: attendance.overtime_hours?.toString() || '0',
       overtime_minutes: attendance.overtime_minutes?.toString() || '0',
       overtime_work_days: attendance.overtime_work_days?.toString() || '0',
-      cutoff_start_date: attendance.cutoff_start_date?.toString() || '',
-      cutoff_end_date: attendance.cutoff_end_date?.toString() || ''
+      cutoff_start_date: normalizeDateInputValue(attendance.cutoff_start_date),
+      cutoff_end_date: normalizeDateInputValue(attendance.cutoff_end_date)
     });
     setShowAddModal(true);
   };
@@ -762,16 +787,6 @@ const AttendanceList = () => {
 
     if (!errors.total_working_days && !errors.absent_days && absentDays > totalWorkingDays) {
       errors.absent_days = 'Hari absen tidak boleh melebihi total hari kerja';
-    }
-
-    if (!errors.total_working_days && !errors.actual_working_days && actualWorkingDays > totalWorkingDays) {
-      errors.actual_working_days = 'Hari kerja aktual tidak boleh melebihi total hari kerja';
-    }
-
-    if (!errors.total_working_days && !errors.absent_days && !errors.actual_working_days) {
-      if (absentDays + actualWorkingDays > totalWorkingDays) {
-        errors.actual_working_days = 'Total hari aktual dan hari absen tidak boleh melebihi total hari kerja';
-      }
     }
 
     const overtimeFields = [

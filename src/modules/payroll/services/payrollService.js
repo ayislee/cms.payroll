@@ -5,6 +5,8 @@
 import apiClient from '../../../utils/apiClient';
 import { API_ENDPOINTS } from '../../../constants/apiEndpoints';
 
+const normalizePayrollPeriod = (payrollPeriod) => String(payrollPeriod || '').trim();
+
 class PayrollService {
   // Get all payrolls with pagination and search
   async getPayrolls(params = {}) {
@@ -98,7 +100,7 @@ class PayrollService {
     try {
       const payload = {
         employee_id: employeeId,
-        payroll_periode: payrollPeriod
+        payroll_periode: normalizePayrollPeriod(payrollPeriod)
       };
 
       if (companyId) {
@@ -118,7 +120,7 @@ class PayrollService {
     try {
       const payload = {
         employee_id: employeeId,
-        payroll_periode: payrollPeriod
+        payroll_periode: normalizePayrollPeriod(payrollPeriod)
       };
 
       if (companyId) {
@@ -134,11 +136,17 @@ class PayrollService {
   }
 
   // Generate mass payroll for all employees
-  async generateMassPayroll(payrollPeriod) {
+  async generateMassPayroll(payrollPeriod, companyId = '') {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.MASS_GENERATE, {
-        payroll_periode: payrollPeriod
-      });
+      const payload = {
+        payroll_periode: normalizePayrollPeriod(payrollPeriod)
+      };
+
+      if (companyId) {
+        payload.company_id = companyId;
+      }
+
+      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.MASS_GENERATE, payload);
       return response.data || response;
     } catch (error) {
       console.error('Error generating mass payroll:', error);
@@ -169,7 +177,7 @@ class PayrollService {
   async generateMassSlip(payrollPeriod) {
     try {
       const response = await apiClient.post(API_ENDPOINTS.PAYROLL.MASS_GENERATE_SLIP, {
-        payroll_periode: payrollPeriod
+        payroll_periode: normalizePayrollPeriod(payrollPeriod)
       });
       return response.data || response;
     } catch (error) {
@@ -179,12 +187,18 @@ class PayrollService {
   }
 
   // Email payroll slip to employee
-  async emailSlip(employeeId, payrollPeriod) {
+  async emailSlip(employeeId, payrollPeriod, companyId = '') {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.EMAIL_SLIP, {
+      const payload = {
         employee_id: employeeId,
-        payroll_periode: payrollPeriod
-      });
+        payroll_periode: normalizePayrollPeriod(payrollPeriod)
+      };
+
+      if (companyId) {
+        payload.company_id = companyId;
+      }
+
+      const response = await apiClient.post(API_ENDPOINTS.PAYROLL.EMAIL_SLIP, payload);
       return response.data || response;
     } catch (error) {
       console.error('Error emailing slip:', error);
@@ -197,7 +211,7 @@ class PayrollService {
     try {
       const response = await apiClient.post(API_ENDPOINTS.PAYROLL.EMAIL_SLIP_MASS, {
         company_id: companyId,
-        payroll_periode: payrollPeriod
+        payroll_periode: normalizePayrollPeriod(payrollPeriod)
       });
       return response.data || response;
     } catch (error) {

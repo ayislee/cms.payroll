@@ -571,6 +571,7 @@ const PayrollList = () => {
   };
 
   const [showMassGenerateModal, setShowMassGenerateModal] = useState(false);
+  const [massGenerateCompanyId, setMassGenerateCompanyId] = useState('');
   const [massPayrollPeriod, setMassPayrollPeriod] = useState(() => getDefaultPayrollPickerValue());
   const [massGenerateError, setMassGenerateError] = useState('');
   const [massGenerating, setMassGenerating] = useState(false);
@@ -591,6 +592,7 @@ const PayrollList = () => {
   const [checkingPayrollId, setCheckingPayrollId] = useState(null);
 
   const openMassGenerateModal = () => {
+    setMassGenerateCompanyId(downloadCompanies.length > 0 ? String(downloadCompanies[0].value) : '');
     setMassPayrollPeriod(getDefaultPayrollPickerValue());
     setMassGenerateError('');
     setShowMassGenerateModal(true);
@@ -598,6 +600,7 @@ const PayrollList = () => {
 
   const closeMassGenerateModal = () => {
     setShowMassGenerateModal(false);
+    setMassGenerateCompanyId('');
     setMassPayrollPeriod(getDefaultPayrollPickerValue());
     setMassGenerateError('');
   };
@@ -610,11 +613,27 @@ const PayrollList = () => {
       return;
     }
 
+    if (downloadCompanies.length === 0) {
+      setMassGenerateError('No companies available for mass payroll generation.');
+      return;
+    }
+
+    if (!massGenerateCompanyId.trim()) {
+      setMassGenerateError('Company is required.');
+      return;
+    }
+
+    const companyIdNumeric = Number(massGenerateCompanyId);
+    if (Number.isNaN(companyIdNumeric) || companyIdNumeric <= 0) {
+      setMassGenerateError('Company ID must be a positive number.');
+      return;
+    }
+
     try {
       setMassGenerating(true);
       setMassGenerateError('');
 
-      const result = await payrollService.generateMassPayroll(normalizedPayrollPeriod);
+      const result = await payrollService.generateMassPayroll(normalizedPayrollPeriod, companyIdNumeric);
 
       showToast(result?.message || 'Mass payroll generation completed.', 'success');
       closeMassGenerateModal();
@@ -846,6 +865,11 @@ const PayrollList = () => {
 
     fetchDownloadCompanies();
   }, []);
+  useEffect(() => {
+    if (showMassGenerateModal && !massGenerateCompanyId && downloadCompanies.length > 0) {
+      setMassGenerateCompanyId(String(downloadCompanies[0].value));
+    }
+  }, [showMassGenerateModal, massGenerateCompanyId, downloadCompanies]);
   useEffect(() => {
     if (showDownloadModal && !downloadCompanyId && downloadCompanies.length > 0) {
       setDownloadCompanyId(String(downloadCompanies[0].value));
@@ -1239,13 +1263,13 @@ const PayrollList = () => {
                   </p>
                 </div>
                 <div className="d-flex flex-wrap gap-2 justify-content-lg-end">
-                  <CButton
+                  {/* <CButton
                     color="primary"
                     onClick={handleGeneratePayroll}
                   >
                     <CIcon icon={cilPlus} className="me-1" />
                     Generate Payroll
-                  </CButton>
+                  </CButton> */}
                   <CButton
                     color="info"
                     onClick={openMassGenerateModal}
@@ -1580,14 +1604,6 @@ const PayrollList = () => {
                                   )}
                                 </CButton>
                                 <CButton
-                                  color="success"
-                                  size="sm"
-                                  title="Print slip"
-                                  disabled={!payroll.is_printed || !hasSlipFile}
-                                >
-                                  <CIcon icon={cilPrint} size="sm" />
-                                </CButton>
-                                <CButton
                                   color="warning"
                                   size="sm"
                                   title="Email slip"
@@ -1915,6 +1931,27 @@ const PayrollList = () => {
           )}
 
           <div className="mb-3">
+            <label className="form-label">Company</label>
+            <CFormSelect
+              value={massGenerateCompanyId}
+              onChange={(e) => setMassGenerateCompanyId(e.target.value)}
+              disabled={massGenerating || downloadCompanies.length === 0}
+            >
+              <option value="">Select company</option>
+              {downloadCompanies.map((company) => (
+                <option key={company.value} value={company.value}>
+                  {company.label}
+                </option>
+              ))}
+            </CFormSelect>
+            {downloadCompanies.length === 0 && (
+              <small className="text-muted">
+                No companies available. Please ensure company data is loaded.
+              </small>
+            )}
+          </div>
+
+          <div className="mb-3">
             <label className="form-label">Payroll Period</label>
             <CFormInput
               type="month"
@@ -1938,7 +1975,7 @@ const PayrollList = () => {
           <CButton
             color="primary"
             onClick={handleMassPayrollGenerate}
-            disabled={massGenerating}
+            disabled={massGenerating || !massGenerateCompanyId || downloadCompanies.length === 0}
           >
             {massGenerating ? (
               <>

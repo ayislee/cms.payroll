@@ -27,7 +27,7 @@ import {
   CModalFooter
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilArrowLeft, cilPrint, cilMoney, cilCloudDownload, cilTrash } from '@coreui/icons';
+import { cilArrowLeft, cilPrint, cilCloudDownload, cilTrash, cilSettings, cilReload, cilCheckCircle, cilEnvelopeClosed } from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import payrollService from '../services/payrollService';
 
@@ -40,6 +40,17 @@ const PayrollDetail = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [showRefreshModal, setShowRefreshModal] = useState(false);
+  const [refreshingPayroll, setRefreshingPayroll] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
+  const [refreshSuccess, setRefreshSuccess] = useState('');
+  const [checkingPayroll, setCheckingPayroll] = useState(false);
+  const [checkError, setCheckError] = useState('');
+  const [checkSuccess, setCheckSuccess] = useState('');
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailingPayroll, setEmailingPayroll] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [emailSuccess, setEmailSuccess] = useState('');
   
   useDocumentTitle('Payroll Detail');
 
@@ -102,16 +113,19 @@ const PayrollDetail = () => {
   };
 
   const getStatusBadge = (isPrinted, isEmailed) => {
-    if (isPrinted && isEmailed) {
+    const checked = isTruthy(isPrinted);
+    const emailed = isTruthy(isEmailed);
+
+    if (checked && emailed) {
       return (
         <>
           <CBadge color="success" className="me-1">Checked</CBadge>
           <CBadge color="success">Emailed</CBadge>
         </>
       );
-    } else if (isPrinted) {
+    } else if (checked) {
       return <CBadge color="success">Checked</CBadge>;
-    } else if (isEmailed) {
+    } else if (emailed) {
       return <CBadge color="success">Emailed</CBadge>;
     } else {
       return <CBadge color="secondary">Needs Check</CBadge>;
@@ -119,15 +133,55 @@ const PayrollDetail = () => {
   };
 
   const canDeletePayroll = (payrollData) =>
-    !Boolean(payrollData?.is_printed) &&
-    !Boolean(payrollData?.is_emailed) &&
-    !Boolean(payrollData?.is_posted);
+    !isTruthy(payrollData?.is_printed) &&
+    !isTruthy(payrollData?.is_emailed) &&
+    !isTruthy(payrollData?.is_posted);
 
   const getDeletePayrollDisabledReason = (payrollData) => {
-    if (payrollData?.is_printed) return 'Payroll already checked and cannot be deleted';
-    if (payrollData?.is_emailed) return 'Payroll already emailed and cannot be deleted';
-    if (payrollData?.is_posted) return 'Payroll already posted and cannot be deleted';
+    if (isTruthy(payrollData?.is_printed)) return 'Payroll already checked and cannot be deleted';
+    if (isTruthy(payrollData?.is_emailed)) return 'Payroll already emailed and cannot be deleted';
+    if (isTruthy(payrollData?.is_posted)) return 'Payroll already posted and cannot be deleted';
     return '';
+  };
+
+  const canRefreshPayroll = (payrollData) =>
+    !isTruthy(payrollData?.is_printed) &&
+    !isTruthy(payrollData?.is_emailed);
+
+  const getRefreshPayrollDisabledReason = (payrollData) => {
+    if (isTruthy(payrollData?.is_emailed)) return 'Payroll already emailed and cannot be regenerated';
+    if (isTruthy(payrollData?.is_printed)) return 'Payroll already checked and cannot be regenerated';
+    return '';
+  };
+
+  const canCheckPayroll = (payrollData) =>
+    Boolean(payrollData?.slip_url) && !isTruthy(payrollData?.is_printed);
+
+  const canReopenPayroll = (payrollData) =>
+    isTruthy(payrollData?.is_printed) && !isTruthy(payrollData?.is_emailed);
+
+  const getCheckPayrollDisabledReason = (payrollData) => {
+    if (isTruthy(payrollData?.is_printed)) {
+      return canReopenPayroll(payrollData)
+        ? 'Reopen payroll for correction'
+        : 'Emailed payroll cannot be reopened';
+    }
+
+    if (!payrollData?.slip_url) return 'Payroll slip is not available';
+    return 'Mark payroll as checked';
+  };
+
+  const canEmailPayroll = (payrollData) =>
+    isTruthy(payrollData?.is_printed) &&
+    Boolean(payrollData?.slip_url) &&
+    Boolean(payrollData?.employee?.email);
+
+  const getEmailPayrollDisabledReason = (payrollData) => {
+    if (!isTruthy(payrollData?.is_printed)) return 'Payroll must be checked before emailing';
+    if (!payrollData?.slip_url) return 'Payroll slip is not available';
+    if (!payrollData?.employee?.email) return 'Employee email is not available';
+    if (isTruthy(payrollData?.is_emailed)) return 'Send payroll slip email again';
+    return 'Send payroll slip email';
   };
 
   const handleDeletePayroll = async () => {
@@ -148,6 +202,148 @@ const PayrollDetail = () => {
       setDeleteError(deleteError.message || 'Failed to delete payroll.');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleRefreshPayroll = async () => {
+    const payrollData = payroll?.payroll;
+    const targetEmployeeId = payrollData?.employee?.employee_id || payrollData?.employee_id;
+    const targetPayrollPeriod = String(payrollData?.payroll_periode || '').trim();
+    const targetCompanyId = payrollData?.company_id || payrollData?.employee?.company_id || '';
+
+    if (!payrollData || !targetEmployeeId || !targetPayrollPeriod) {
+      return;
+    }
+
+    try {
+      setRefreshingPayroll(true);
+      setRefreshError('');
+      setRefreshSuccess('');
+
+      await payrollService.generatePayroll(
+        targetEmployeeId,
+        targetPayrollPeriod,
+        targetCompanyId
+      );
+      setShowRefreshModal(false);
+      setRefreshSuccess('Payroll berhasil diperbaharui.');
+      setCheckSuccess('');
+      setEmailSuccess('');
+      await loadPayrollDetail();
+    } catch (error) {
+      console.error('Error refreshing payroll:', error);
+      setRefreshError(error.message || 'Gagal memperbaharui payroll.');
+    } finally {
+      setRefreshingPayroll(false);
+    }
+  };
+
+  const handleCheckPayroll = async () => {
+    const payrollData = payroll?.payroll;
+    if (!payrollData?.payroll_id) {
+      return;
+    }
+
+    const isChecked = isTruthy(payrollData.is_printed);
+    const nextChecked = !isChecked;
+
+    if (!isChecked && !canCheckPayroll(payrollData)) {
+      setCheckError(getCheckPayrollDisabledReason(payrollData));
+      return;
+    }
+
+    if (isChecked && !canReopenPayroll(payrollData)) {
+      setCheckError(getCheckPayrollDisabledReason(payrollData));
+      return;
+    }
+
+    try {
+      setCheckingPayroll(true);
+      setCheckError('');
+      setCheckSuccess('');
+      setRefreshSuccess('');
+      setEmailSuccess('');
+
+      const response = await payrollService.updatePayroll(payrollData.payroll_id, {
+        is_printed: nextChecked
+      });
+      const updatedPayroll = response?.data || null;
+
+      setPayroll((previous) => {
+        if (!previous?.payroll) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          payroll: {
+            ...previous.payroll,
+            ...(updatedPayroll || {}),
+            is_printed: nextChecked
+          }
+        };
+      });
+
+      setCheckSuccess(
+        nextChecked
+          ? 'Payroll berhasil ditandai sudah diverifikasi.'
+          : 'Payroll berhasil dibuka kembali untuk koreksi.'
+      );
+    } catch (error) {
+      console.error('Error updating payroll check status:', error);
+      setCheckError(error.message || 'Gagal mengubah status verifikasi payroll.');
+    } finally {
+      setCheckingPayroll(false);
+    }
+  };
+
+  const handleEmailPayroll = async () => {
+    const payrollData = payroll?.payroll;
+    const targetEmployeeId = payrollData?.employee?.employee_id || payrollData?.employee_id;
+    const targetPayrollPeriod = String(payrollData?.payroll_periode || '').trim();
+    const targetCompanyId = payrollData?.company_id || payrollData?.employee?.company_id || '';
+
+    if (!payrollData || !targetEmployeeId || !targetPayrollPeriod) {
+      setEmailError('Data payroll tidak lengkap untuk mengirim email.');
+      return;
+    }
+
+    if (!canEmailPayroll(payrollData)) {
+      setEmailError(getEmailPayrollDisabledReason(payrollData));
+      return;
+    }
+
+    try {
+      setEmailingPayroll(true);
+      setEmailError('');
+      setEmailSuccess('');
+      setRefreshSuccess('');
+      setCheckSuccess('');
+
+      await payrollService.emailSlip(targetEmployeeId, targetPayrollPeriod, targetCompanyId);
+      setShowEmailModal(false);
+      setEmailSuccess('Email slip payroll berhasil dikirim.');
+
+      setPayroll((previous) => {
+        if (!previous?.payroll) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          payroll: {
+            ...previous.payroll,
+            is_emailed: true
+          }
+        };
+      });
+
+      await loadPayrollDetail();
+    } catch (error) {
+      console.error('Error sending payroll email:', error);
+      setEmailError(error.message || 'Gagal mengirim email slip payroll.');
+    } finally {
+      setEmailingPayroll(false);
     }
   };
 
@@ -230,6 +426,25 @@ const PayrollDetail = () => {
     payroll.payroll.company?.email ||
     '-';
   const slipUrl = payroll.payroll.slip_url;
+  const employeeId = payroll.payroll.employee?.employee_id || payroll.payroll.employee_id;
+  const payrollPeriod = String(payroll.payroll.payroll_periode || '').trim();
+  const summaryTotals = payroll.summary
+    ? {
+        totalEarning: payroll.summary.total_earning,
+        totalDeduction: payroll.summary.total_deduction,
+        employeeBenefit: payroll.summary.employee_benefit_total,
+        employerBenefit: payroll.summary.employer_benefit_total,
+        totalBenefit: payroll.summary.benefit_total,
+        taxableBenefit: payroll.summary.taxable_benefit_total
+      }
+    : {
+        totalEarning,
+        totalDeduction,
+        employeeBenefit: totalEmployeeBenefit,
+        employerBenefit: totalEmployerBenefit,
+        totalBenefit,
+        taxableBenefit: totalTaxableBenefit
+      };
 
   return (
     <CRow>
@@ -260,13 +475,75 @@ const PayrollDetail = () => {
           </CModalFooter>
         </CModal>
 
+        <CModal visible={showRefreshModal} onClose={() => setShowRefreshModal(false)} alignment="center">
+          <CModalHeader>
+            <CModalTitle>Perbaharui Payroll</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <p className="mb-2">
+              Payroll untuk <strong>{payroll.payroll.employee.name}</strong> periode <strong>{payrollPeriod}</strong> akan digenerate ulang.
+            </p>
+            <p className="mb-0 text-medium-emphasis">
+              Data payroll detail akan dihitung ulang berdasarkan konfigurasi komponen karyawan saat ini.
+            </p>
+            {refreshError && (
+              <CAlert color="danger" className="mt-3 mb-0">{refreshError}</CAlert>
+            )}
+          </CModalBody>
+          <CModalFooter>
+            <CButton
+              color="secondary"
+              variant="outline"
+              onClick={() => setShowRefreshModal(false)}
+              disabled={refreshingPayroll}
+            >
+              Batal
+            </CButton>
+            <CButton color="primary" onClick={handleRefreshPayroll} disabled={refreshingPayroll}>
+              {refreshingPayroll ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilReload} className="me-1" />}
+              Perbaharui
+            </CButton>
+          </CModalFooter>
+        </CModal>
+
+        <CModal visible={showEmailModal} onClose={() => setShowEmailModal(false)} alignment="center">
+          <CModalHeader>
+            <CModalTitle>Send Slip Email</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <p className="mb-2">
+              Send payroll slip email to <strong>{payroll.payroll.employee.name}</strong> at <strong>{payroll.payroll.employee.email || '-'}</strong> for period <strong>{payrollPeriod}</strong>?
+            </p>
+            <p className="mb-0 text-medium-emphasis">
+              Payroll yang sudah dikirim email tidak bisa dibuka kembali untuk koreksi.
+            </p>
+            {emailError && (
+              <CAlert color="danger" className="mt-3 mb-0">{emailError}</CAlert>
+            )}
+          </CModalBody>
+          <CModalFooter>
+            <CButton
+              color="secondary"
+              variant="outline"
+              onClick={() => setShowEmailModal(false)}
+              disabled={emailingPayroll}
+            >
+              Cancel
+            </CButton>
+            <CButton color="warning" onClick={handleEmailPayroll} disabled={emailingPayroll}>
+              {emailingPayroll ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilEnvelopeClosed} className="me-1" />}
+              Send Email
+            </CButton>
+          </CModalFooter>
+        </CModal>
+
         <CCard className="mb-4">
           <CCardHeader>
             <CRow className="align-items-center">
               <CCol>
                 <h4 className="mb-0">Payroll Detail</h4>
                 <small className="text-medium-emphasis">
-                  Payroll ID: #{payroll.payroll.payroll_id} | Period: {payroll.payroll.payroll_periode}
+                  Payroll ID: #{payroll.payroll.payroll_id} | Period: {payrollPeriod}
                 </small>
               </CCol>
               <CCol xs="auto" className="d-flex flex-wrap gap-2">
@@ -283,13 +560,22 @@ const PayrollDetail = () => {
                     Download Slip
                   </CButton>
                 )}
-                <CButton color="secondary" variant="outline">
+                {/* <CButton color="secondary" variant="outline">
                   <CIcon icon={cilPrint} className="me-1" />
                   Print
-                </CButton>
-                <CButton color="info" variant="outline">
-                  <CIcon icon={cilMoney} className="me-1" />
-                  Email
+                </CButton> */}
+                <CButton
+                  color="info"
+                  variant="outline"
+                  title={getEmailPayrollDisabledReason(payroll.payroll)}
+                  disabled={!canEmailPayroll(payroll.payroll) || emailingPayroll}
+                  onClick={() => {
+                    setEmailError('');
+                    setShowEmailModal(true);
+                  }}
+                >
+                  {emailingPayroll ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilEnvelopeClosed} className="me-1" />}
+                  {isTruthy(payroll.payroll.is_emailed) ? 'Email Again' : 'Email'}
                 </CButton>
                 <CButton
                   color="danger"
@@ -309,6 +595,27 @@ const PayrollDetail = () => {
             </CRow>
           </CCardHeader>
           <CCardBody>
+            {refreshSuccess && (
+              <CAlert color="success" dismissible onClose={() => setRefreshSuccess('')}>
+                {refreshSuccess}
+              </CAlert>
+            )}
+            {checkSuccess && (
+              <CAlert color="success" dismissible onClose={() => setCheckSuccess('')}>
+                {checkSuccess}
+              </CAlert>
+            )}
+            {checkError && (
+              <CAlert color="danger" dismissible onClose={() => setCheckError('')}>
+                {checkError}
+              </CAlert>
+            )}
+            {emailSuccess && (
+              <CAlert color="success" dismissible onClose={() => setEmailSuccess('')}>
+                {emailSuccess}
+              </CAlert>
+            )}
+
             {/* Employee Information */}
             <div className="border rounded p-3 mb-4">
               <h5>Employee Information</h5>
@@ -333,6 +640,57 @@ const PayrollDetail = () => {
                 </CCol>
               </CRow>
             </div>
+
+            {employeeId && (
+              <div className="d-flex flex-wrap justify-content-end gap-2 mb-4">
+                <CButton
+                  color="secondary"
+                  variant="outline"
+                  title="Open employee payroll component settings"
+                  onClick={() => navigate(`/employees/${employeeId}/settings`)}
+                >
+                  <CIcon icon={cilSettings} className="me-1" />
+                  Employee Settings
+                </CButton>
+                <CButton
+                  color="primary"
+                  variant="outline"
+                  title={
+                    canRefreshPayroll(payroll.payroll)
+                      ? 'Generate ulang payroll employee'
+                      : getRefreshPayrollDisabledReason(payroll.payroll)
+                  }
+                  disabled={!canRefreshPayroll(payroll.payroll) || refreshingPayroll}
+                  onClick={() => {
+                    setRefreshError('');
+                    setShowRefreshModal(true);
+                  }}
+                >
+                  {refreshingPayroll ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilReload} className="me-1" />}
+                  Perbaharui
+                </CButton>
+                <CButton
+                  color={isTruthy(payroll.payroll.is_printed) ? 'warning' : 'success'}
+                  variant="outline"
+                  title={getCheckPayrollDisabledReason(payroll.payroll)}
+                  disabled={
+                    checkingPayroll ||
+                    (!isTruthy(payroll.payroll.is_printed) && !canCheckPayroll(payroll.payroll)) ||
+                    (isTruthy(payroll.payroll.is_printed) && !canReopenPayroll(payroll.payroll))
+                  }
+                  onClick={handleCheckPayroll}
+                >
+                  {checkingPayroll ? (
+                    <CSpinner size="sm" className="me-2" />
+                  ) : isTruthy(payroll.payroll.is_printed) ? (
+                    <CIcon icon={cilReload} className="me-1" />
+                  ) : (
+                    <CIcon icon={cilCheckCircle} className="me-1" />
+                  )}
+                  {isTruthy(payroll.payroll.is_printed) ? 'Reopen Payroll for Correction' : 'Check'}
+                </CButton>
+              </div>
+            )}
 
             {/* Earnings */}
             <div className="border rounded p-3 mb-4">
@@ -459,25 +817,12 @@ const PayrollDetail = () => {
               <CRow>
                 <CCol md={8}>
                   <h5>Summary</h5>
-                  {payroll.summary ? (
-                    <>
-                      <p><strong>Total Earnings:</strong> {formatCurrency(payroll.summary.total_earning)}</p>
-                      <p><strong>Total Deductions:</strong> {formatCurrency(payroll.summary.total_deduction)}</p>
-                      <p><strong>Employee Benefit:</strong> {formatCurrency(payroll.summary.employee_benefit_total)}</p>
-                      <p><strong>Employer Benefit:</strong> {formatCurrency(payroll.summary.employer_benefit_total)}</p>
-                      <p><strong>Total Benefit:</strong> {formatCurrency(payroll.summary.benefit_total)}</p>
-                      <p><strong>Taxable Benefit:</strong> {formatCurrency(payroll.summary.taxable_benefit_total)}</p>
-                    </>
-                  ) : (
-                    <>
-                      <p><strong>Total Earnings:</strong> {formatCurrency(totalEarning)}</p>
-                      <p><strong>Total Deductions:</strong> {formatCurrency(totalDeduction)}</p>
-                      <p><strong>Employee Benefit:</strong> {formatCurrency(totalEmployeeBenefit)}</p>
-                      <p><strong>Employer Benefit:</strong> {formatCurrency(totalEmployerBenefit)}</p>
-                      <p><strong>Total Benefit:</strong> {formatCurrency(totalBenefit)}</p>
-                      <p><strong>Taxable Benefit:</strong> {formatCurrency(totalTaxableBenefit)}</p>
-                    </>
-                  )}
+                  <p><strong>Total Earnings:</strong> {formatCurrency(summaryTotals.totalEarning)}</p>
+                  <p><strong>Total Deductions:</strong> {formatCurrency(summaryTotals.totalDeduction)}</p>
+                  <p><strong>Employee Contribution:</strong> {formatCurrency(summaryTotals.employeeBenefit)}</p>
+                  <p><strong>Company Contribution:</strong> {formatCurrency(summaryTotals.employerBenefit)}</p>
+                  <p><strong>Total Benefit:</strong> {formatCurrency(summaryTotals.totalBenefit)}</p>
+                  <p><strong>Taxable Benefit:</strong> {formatCurrency(summaryTotals.taxableBenefit)}</p>
                 </CCol>
                 <CCol md={4} className="text-end">
                   <h5>Net Pay</h5>

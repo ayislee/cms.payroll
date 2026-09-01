@@ -641,49 +641,7 @@ const Dashboard = () => {
             </CRow>
           )}
 
-          {canViewPayroll && (
-            <CRow className="mb-4">
-              <CCol xs={12}>
-                <CCard>
-                  <CCardHeader>
-                    <CIcon icon={cilChart} className="me-2" />
-                    Tren Net Pay (Per Periode)
-                  </CCardHeader>
-                  <CCardBody>
-                    {netPayChartData ? (
-                      <CChartLine data={netPayChartData} options={lineChartOptions} style={{ height: '320px' }} />
-                    ) : (
-                      <div className="text-center py-4 text-medium-emphasis">
-                        Belum ada data net pay terbaru untuk rentang periode ini.
-                      </div>
-                    )}
-                  </CCardBody>
-                </CCard>
-              </CCol>
-            </CRow>
-          )}
 
-          {canViewAttendance && (
-            <CRow>
-              <CCol xs={12}>
-                <CCard>
-                  <CCardHeader>
-                    <CIcon icon={cilCalendar} className="me-2" />
-                    Tren Kehadiran Per Periode
-                  </CCardHeader>
-                  <CCardBody>
-                    {attendanceChartData ? (
-                      <CChartBar data={attendanceChartData} options={barChartOptions} style={{ height: '320px' }} />
-                    ) : (
-                      <div className="text-center py-4 text-medium-emphasis">
-                        Belum ada data kehadiran untuk rentang periode ini.
-                      </div>
-                    )}
-                  </CCardBody>
-                </CCard>
-              </CCol>
-            </CRow>
-          )}
         </>
       )}
     </>

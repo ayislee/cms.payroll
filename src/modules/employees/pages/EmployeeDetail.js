@@ -3,7 +3,7 @@
 // ========================================
 
 import React, { useState, useEffect } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   CRow,
   CCol,
@@ -91,9 +91,21 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 0
   });
 
+const getTabFromLocation = (location) => {
+  const searchParams = new URLSearchParams(location.search);
+  const queryTab = searchParams.get('tab');
+
+  if (['details', 'benefit', 'settings'].includes(queryTab)) {
+    return queryTab;
+  }
+
+  return location.pathname.endsWith('/settings') ? 'settings' : 'details';
+};
+
 const EmployeeDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasPermission } = useAuth();
 
   // State management
@@ -110,7 +122,7 @@ const EmployeeDetail = () => {
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState(() => getTabFromLocation(location));
   const [editingComponent, setEditingComponent] = useState(null);
   const [componentForm, setComponentForm] = useState({ amount: 0, is_active: true });
   const [componentStatusUpdatingId, setComponentStatusUpdatingId] = useState(null);
@@ -122,6 +134,10 @@ const EmployeeDetail = () => {
 
   // Set document title
   useDocumentTitle(employee ? `${employee.name} - Employee Detail` : 'Employee Detail');
+
+  useEffect(() => {
+    setActiveTab(getTabFromLocation(location));
+  }, [location]);
 
   // Load employee data
   useEffect(() => {

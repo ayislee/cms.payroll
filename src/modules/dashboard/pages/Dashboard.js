@@ -15,7 +15,12 @@ import {
   CForm,
   CFormInput,
   CButton,
-  CFormSelect
+  CFormSelect,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import {
@@ -26,7 +31,8 @@ import {
   cilChart,
   cilCheckCircle,
   cilWarning,
-  cilBuilding
+  cilBuilding,
+  cilCloudDownload
 } from '@coreui/icons';
 import { CChartLine, CChartBar } from '@coreui/react-chartjs';
 import { getStyle } from '@coreui/utils';
@@ -44,7 +50,9 @@ import { PERMISSIONS } from '../../../constants/userRoles';
 import apiClient from '../../../utils/apiClient';
 import { API_ENDPOINTS } from '../../../constants/apiEndpoints';
 import { useDocumentTitle } from '../../../utils/documentTitle';
+import config from '../../../config/environment';
 import companyService from '../../companies/services/companyService';
+import payrollService from '../../payroll/services/payrollService';
 
 const formatPeriodLabel = (period, fallbackLabel) => {
   if (!period) {
@@ -122,6 +130,11 @@ const Dashboard = () => {
     { value: '', label: 'Semua Perusahaan' }
   ]);
   const [companyOptionsLoading, setCompanyOptionsLoading] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadPeriod, setDownloadPeriod] = useState(() => getCurrentPayrollPickerValue());
+  const [downloadCompanyId, setDownloadCompanyId] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+  const [downloadingPayroll, setDownloadingPayroll] = useState(false);
 
   useDocumentTitle('Dashboard');
 
@@ -228,6 +241,84 @@ const Dashboard = () => {
     setFilterForm(createDefaultFilterForm());
     setActiveFilters(defaultActiveFilters);
     writeSessionFilter(DASHBOARD_FILTER_STORAGE_KEY, defaultActiveFilters);
+  };
+
+  const openDownloadModal = () => {
+    const selectedPeriod = activeFilters.periodEnd || activeFilters.periodStart || getCurrentPayrollPeriod();
+    const selectedCompany = activeFilters.companyId || '';
+
+    setDownloadPeriod(payrollPeriodToPickerValue(selectedPeriod) || getCurrentPayrollPickerValue());
+    setDownloadCompanyId(selectedCompany);
+    setDownloadError('');
+    setShowDownloadModal(true);
+  };
+
+  const closeDownloadModal = () => {
+    setShowDownloadModal(false);
+    setDownloadPeriod(getCurrentPayrollPickerValue());
+    setDownloadCompanyId('');
+    setDownloadError('');
+  };
+
+  const handleDownloadPayroll = async () => {
+    const selectedPeriod = pickerValueToPayrollPeriod(downloadPeriod);
+    const selectedCompanyId = downloadCompanyId ? Number(downloadCompanyId) : null;
+
+    if (!selectedPeriod) {
+      setDownloadError('Periode payroll harus dipilih.');
+      return;
+    }
+
+    if (downloadCompanyId && (!Number.isFinite(selectedCompanyId) || selectedCompanyId <= 0)) {
+      setDownloadError('ID perusahaan tidak valid.');
+      return;
+    }
+
+    try {
+      setDownloadingPayroll(true);
+      setDownloadError('');
+
+      const responseData = await payrollService.downloadPayroll(selectedPeriod, selectedCompanyId);
+      const payload = responseData?.data ? responseData.data : responseData;
+      const downloadUrl = payload?.download_url || null;
+      const fallbackName = payload?.file_name || `payroll-${selectedPeriod}.xlsx`;
+
+      if (!downloadUrl) {
+        throw new Error('File payroll tidak tersedia untuk periode yang dipilih.');
+      }
+
+      const token = localStorage.getItem(config.auth.tokenStorageKey);
+      if (!token) {
+        throw new Error('Token autentikasi tidak ditemukan. Silakan login ulang.');
+      }
+
+      const response = await fetch(downloadUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal mengambil file payroll.');
+      }
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fallbackName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+
+      closeDownloadModal();
+    } catch (err) {
+      console.error('Error downloading dashboard payroll:', err);
+      setDownloadError(err.message || 'Gagal mengunduh payroll.');
+    } finally {
+      setDownloadingPayroll(false);
+    }
   };
 
   const employeesMetrics = overview?.metrics?.employees || {
@@ -496,6 +587,65 @@ const Dashboard = () => {
         </CCol>
       </CRow>
 
+      <CRow className="mb-4">
+        <CCol xs={12}>
+          <div className="d-flex justify-content-end">
+            <CButton
+              color="dark"
+              onClick={openDownloadModal}
+              disabled={loading}
+            >
+              <CIcon icon={cilCloudDownload} className="me-2" />
+              Download Payroll
+            </CButton>
+          </div>
+        </CCol>
+      </CRow>
+
+      <CModal visible={showDownloadModal} onClose={closeDownloadModal} alignment="center">
+        <CModalHeader>
+          <CModalTitle>Download Payroll</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {downloadError && (
+            <CAlert color="danger" className="mb-3">{downloadError}</CAlert>
+          )}
+
+          <div className="mb-3">
+            <label className="form-label">Payroll Period</label>
+            <CFormInput
+              type="month"
+              value={downloadPeriod}
+              onChange={(e) => setDownloadPeriod(e.target.value)}
+              disabled={downloadingPayroll}
+            />
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label">Company</label>
+            <CFormSelect
+              value={downloadCompanyId}
+              onChange={(e) => setDownloadCompanyId(e.target.value)}
+              disabled={downloadingPayroll || companyOptions.length <= 1}
+            >
+              {companyOptions.map((option) => (
+                <option key={option.value || 'all'} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </CFormSelect>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" variant="outline" onClick={closeDownloadModal} disabled={downloadingPayroll}>
+            Batal
+          </CButton>
+          <CButton color="dark" onClick={handleDownloadPayroll} disabled={downloadingPayroll}>
+            {downloadingPayroll ? 'Mengunduh...' : 'Download'}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
       {!overview ? (
         <CAlert color="warning">Data dashboard belum tersedia.</CAlert>
       ) : (
@@ -561,16 +711,7 @@ const Dashboard = () => {
 
           {canViewPayroll && (
             <CRow className="mb-4">
-              <CCol sm={6} lg={4} xl={3}>
-                <CWidgetStatsA
-                  className="mb-4"
-                  color="info"
-                  value={toLocaleNumber(payrollMetrics.total_records)}
-                  title="Total Data Payroll"
-                  action={<CIcon icon={cilClipboard} height={48} className="text-white-50" />}
-                />
-              </CCol>
-              <CCol sm={6} lg={4} xl={3}>
+              <CCol sm={6} lg={4} xl={4}>
                 <CWidgetStatsA
                   className="mb-4"
                   color="success"
@@ -579,7 +720,7 @@ const Dashboard = () => {
                   action={<CIcon icon={cilCash} height={48} className="text-white-50" />}
                 />
               </CCol>
-              <CCol sm={6} lg={4} xl={3}>
+              <CCol sm={6} lg={4} xl={4}>
                 <CWidgetStatsA
                   className="mb-4"
                   color="warning"
@@ -588,22 +729,13 @@ const Dashboard = () => {
                   action={<CIcon icon={cilWarning} height={48} className="text-white-50" />}
                 />
               </CCol>
-              <CCol sm={6} lg={4} xl={3}>
+              <CCol sm={6} lg={4} xl={4}>
                 <CWidgetStatsA
                   className="mb-4"
                   color="primary"
                   value={formatCurrency(payrollMetrics.projected_net_pay, { maximumFractionDigits: 0 })}
                   title="Total Proyeksi Net Pay"
                   action={<CIcon icon={cilChart} height={48} className="text-white-50" />}
-                />
-              </CCol>
-              <CCol sm={6} lg={4} xl={3}>
-                <CWidgetStatsA
-                  className="mb-4"
-                  color="dark"
-                  value={formatPeriodLabel(payrollMetrics.period || payrollMetrics.period_end, '-')}
-                  title="Periode Payroll Terakhir"
-                  action={<CIcon icon={cilCalendar} height={48} className="text-white-50" />}
                 />
               </CCol>
             </CRow>

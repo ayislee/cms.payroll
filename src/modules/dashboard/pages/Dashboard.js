@@ -32,7 +32,8 @@ import {
   cilCheckCircle,
   cilWarning,
   cilBuilding,
-  cilCloudDownload
+  cilCloudDownload,
+  cilEnvelopeClosed
 } from '@coreui/icons';
 import { CChartLine, CChartBar } from '@coreui/react-chartjs';
 import { getStyle } from '@coreui/utils';
@@ -331,6 +332,7 @@ const Dashboard = () => {
     total_records: 0,
     checked_records: 0,
     unchecked_records: 0,
+    emailed_records: 0,
     total_net_pay: 0,
     checked_net_pay: 0,
     unchecked_net_pay: 0,
@@ -652,7 +654,7 @@ const Dashboard = () => {
         <>
           <CRow className="mb-4">
             <CCol xs={12}>
-              <CCard>
+              <CCard className="shadow-sm border-0">
                 <CCardHeader>
                   <CIcon icon={cilBuilding} className="me-2" />
                   Ringkasan Perusahaan
@@ -663,10 +665,10 @@ const Dashboard = () => {
                       <div className="text-medium-emphasis small">Perusahaan</div>
                       <strong>{overview.company_name || '-'}</strong>
                     </div>
-                    <div>
+                    {/* <div>
                       <div className="text-medium-emphasis small">ID Perusahaan</div>
                       <strong>{overview.company_id ?? '-'}</strong>
-                    </div>
+                    </div> */}
                     <div>
                       <div className="text-medium-emphasis small">Rentang Periode</div>
                       <strong>{periodRangeLabel}</strong>
@@ -681,7 +683,7 @@ const Dashboard = () => {
             <CRow className="mb-4">
               <CCol sm={6} lg={4}>
                 <CWidgetStatsA
-                  className="mb-4"
+                  className="mb-4 shadow-sm border-0"
                   color="primary"
                   value={toLocaleNumber(employeesMetrics.total)}
                   title="Total Pegawai"
@@ -690,7 +692,7 @@ const Dashboard = () => {
               </CCol>
               <CCol sm={6} lg={4}>
                 <CWidgetStatsA
-                  className="mb-4"
+                  className="mb-4 shadow-sm border-0"
                   color="success"
                   value={toLocaleNumber(employeesMetrics.active)}
                   title="Pegawai Aktif"
@@ -699,7 +701,7 @@ const Dashboard = () => {
               </CCol>
               <CCol sm={6} lg={4}>
                 <CWidgetStatsA
-                  className="mb-4"
+                  className="mb-4 shadow-sm border-0"
                   color="danger"
                   value={toLocaleNumber(employeesMetrics.inactive)}
                   title="Pegawai Tidak Aktif"
@@ -710,42 +712,74 @@ const Dashboard = () => {
           )}
 
           {canViewPayroll && (
-            <CRow className="mb-4">
-              <CCol sm={6} lg={4} xl={4}>
-                <CWidgetStatsA
-                  className="mb-4"
-                  color="success"
-                  value={formatCurrency(payrollMetrics.checked_net_pay ?? payrollMetrics.total_net_pay, { maximumFractionDigits: 0 })}
-                  title="Total Net Pay Checked"
-                  action={<CIcon icon={cilCash} height={48} className="text-white-50" />}
-                />
-              </CCol>
-              <CCol sm={6} lg={4} xl={4}>
-                <CWidgetStatsA
-                  className="mb-4"
-                  color="warning"
-                  value={formatCurrency(payrollMetrics.unchecked_net_pay, { maximumFractionDigits: 0 })}
-                  title="Total Net Pay Belum Check"
-                  action={<CIcon icon={cilWarning} height={48} className="text-white-50" />}
-                />
-              </CCol>
-              <CCol sm={6} lg={4} xl={4}>
-                <CWidgetStatsA
-                  className="mb-4"
-                  color="primary"
-                  value={formatCurrency(payrollMetrics.projected_net_pay, { maximumFractionDigits: 0 })}
-                  title="Total Proyeksi Net Pay"
-                  action={<CIcon icon={cilChart} height={48} className="text-white-50" />}
-                />
-              </CCol>
-            </CRow>
+            <>
+              <CRow className="mb-4">
+                <CCol sm={6} lg={4} xl={4}>
+                  <CWidgetStatsA
+                    className="mb-4 shadow-sm border-0"
+                    color="success"
+                    value={formatCurrency(payrollMetrics.checked_net_pay ?? payrollMetrics.total_net_pay, { maximumFractionDigits: 0 })}
+                    title="Total Net Pay Checked"
+                    action={<CIcon icon={cilCash} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+                <CCol sm={6} lg={4} xl={4}>
+                  <CWidgetStatsA
+                    className="mb-4 shadow-sm border-0"
+                    color="warning"
+                    value={formatCurrency(payrollMetrics.unchecked_net_pay, { maximumFractionDigits: 0 })}
+                    title="Total Net Pay Belum Check"
+                    action={<CIcon icon={cilWarning} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+                <CCol sm={6} lg={4} xl={4}>
+                  <CWidgetStatsA
+                    className="mb-4 shadow-sm border-0"
+                    color="primary"
+                    value={formatCurrency(payrollMetrics.projected_net_pay, { maximumFractionDigits: 0 })}
+                    title="Total Proyeksi Net Pay"
+                    action={<CIcon icon={cilChart} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+              </CRow>
+
+              <CRow className="mb-4">
+                <CCol sm={6} lg={4} xl={4}>
+                  <CWidgetStatsA
+                    className="mb-4 shadow-sm border-0"
+                    color="success"
+                    value={toLocaleNumber(payrollMetrics.checked_records)}
+                    title="Total Payroll Checked"
+                    action={<CIcon icon={cilCheckCircle} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+                <CCol sm={6} lg={4} xl={4}>
+                  <CWidgetStatsA
+                    className="mb-4 shadow-sm border-0"
+                    color="warning"
+                    value={toLocaleNumber(payrollMetrics.unchecked_records)}
+                    title="Total Payroll Belum Check"
+                    action={<CIcon icon={cilWarning} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+                <CCol sm={6} lg={4} xl={4}>
+                  <CWidgetStatsA
+                    className="mb-4 shadow-sm border-0"
+                    color="info"
+                    value={toLocaleNumber(payrollMetrics.emailed_records)}
+                    title="Total Payroll Telah di Email"
+                    action={<CIcon icon={cilEnvelopeClosed} height={48} className="text-white-50" />}
+                  />
+                </CCol>
+              </CRow>
+            </>
           )}
 
           {canViewAttendance && (
             <CRow className="mb-4">
               <CCol sm={6} lg={4}>
                 <CWidgetStatsA
-                  className="mb-4"
+                  className="mb-4 shadow-sm border-0"
                   color="primary"
                   value={toLocaleNumber(attendanceMetrics.total_records)}
                   title="Total Kehadiran"
@@ -754,7 +788,7 @@ const Dashboard = () => {
               </CCol>
               <CCol sm={6} lg={4}>
                 <CWidgetStatsA
-                  className="mb-4"
+                  className="mb-4 shadow-sm border-0"
                   color="info"
                   value={toLocaleNumber(attendanceMetrics.covered_employees)}
                   title="Karyawan Tercakup"
@@ -763,7 +797,7 @@ const Dashboard = () => {
               </CCol>
               <CCol sm={6} lg={4}>
                 <CWidgetStatsA
-                  className="mb-4"
+                  className="mb-4 shadow-sm border-0"
                   color="warning"
                   value={`${attendanceCoverage}%`}
                   title="Tingkat Cakupan Kehadiran"

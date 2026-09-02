@@ -1052,7 +1052,7 @@ const AttendanceList = () => {
             {/* Search Form */}
             <CForm onSubmit={handleSearchSubmit} className="mb-4">
               <CRow className="g-3 align-items-md-end">
-                <CCol md={6}>
+                <CCol md={5}>
                   <CInputGroup>
                     <CInputGroupText>
                       <CIcon icon={cilSearch} />
@@ -1066,7 +1066,16 @@ const AttendanceList = () => {
                     />
                   </CInputGroup>
                 </CCol>
-                <CCol md={6}>
+                <CCol md={3}>
+                  <CFormLabel htmlFor="attendance-period-filter" className="mb-1">Periode</CFormLabel>
+                  <CFormInput
+                    id="attendance-period-filter"
+                    type="month"
+                    value={payrollPeriodToPickerValue(filters.payroll_periode) || ''}
+                    onChange={(e) => handleFilterChange('payroll_periode', pickerValueToPayrollPeriod(e.target.value))}
+                  />
+                </CCol>
+                <CCol md={4}>
                   <div className="d-grid gap-2 d-md-flex justify-content-md-end">
                     <CButton type="submit" color="primary">
                       <CIcon icon={cilSearch} className="me-1" />
@@ -1080,30 +1089,9 @@ const AttendanceList = () => {
               </CRow>
 
               <CCollapse visible={showFilters} className="mt-3">
-                <CRow className="g-3">
-                  <CCol md={6}>
-                    <CFormInput
-                      type="text"
-                      placeholder="Payroll Period (YYYYMM)"
-                      value={filters.payroll_periode}
-                      onChange={(e) => handleFilterChange('payroll_periode', e.target.value)}
-                    />
-                    <div className="small text-medium-emphasis mt-1">
-                      Example: enter 202501 to focus on January 2025 records.
-                    </div>
-                  </CCol>
-                  <CCol md={6}>
-                    <CFormInput
-                      type="text"
-                      placeholder="Employee ID"
-                      value={filters.employee_id}
-                      onChange={(e) => handleFilterChange('employee_id', e.target.value)}
-                    />
-                    <div className="small text-medium-emphasis mt-1">
-                      Narrow results to a specific employee identifier.
-                    </div>
-                  </CCol>
-                </CRow>
+                <div className="small text-medium-emphasis">
+                  Filter tambahan tidak tersedia untuk tampilan ini.
+                </div>
               </CCollapse>
             </CForm>
 

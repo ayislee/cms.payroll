@@ -1,0 +1,52 @@
+.company-period-table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.company-period-table {
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+.company-period-company-column {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 180px;
+  min-width: 180px;
+  background: var(--cui-card-bg, #fff);
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
+.company-period-table thead .company-period-company-column {
+  z-index: 3;
+  background: var(--cui-tertiary-bg, #f8f9fa);
+}
+
+.company-period-period-column {
+  width: 260px;
+  min-width: 260px;
+  vertical-align: top;
+}
+
+.company-period-metrics {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 220px;
+}
+
+.company-period-metric {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.8rem;
+}
+
+.company-period-metric span {
+  color: var(--cui-secondary-color);
+}
+
+.company-period-metric strong {
+  white-space: nowrap;
+  text-align: right;
+}

@@ -98,6 +98,57 @@ class AttendanceService {
       throw this.handleError(error);
     }
   }
+
+  async downloadAttendance(payrollPeriode) {
+    try {
+      const normalizedPeriod = String(payrollPeriode || '').trim();
+      if (!/^\d{6}$/.test(normalizedPeriod)) {
+        throw new Error('Payroll period must use YYYYMM format.');
+      }
+
+      const response = await apiClient.get(API_ENDPOINTS.ATTENDANCE.DOWNLOAD(normalizedPeriod));
+      return response?.data || response;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async triggerAttendanceDownload(downloadUrl) {
+    try {
+      const token = localStorage.getItem('payroll_auth_token_6f88ce5ae28abba7');
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+          Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to download attendance file');
+      }
+
+      const blob = await response.blob();
+      const fileNameHeader = response.headers.get('content-disposition');
+      const fallbackName = fileNameHeader
+        ? fileNameHeader.split('filename=')[1]?.replace(/['"]/g, '')
+        : 'attendance-download.xlsx';
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fallbackName || 'attendance-download.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      return { fileName: fallbackName || 'attendance-download.xlsx' };
+    } catch (error) {
+      throw new Error(error.message || 'Failed to download attendance file');
+    }
+  }
   // Handle API errors
   handleError(error) {
     console.error('API Error:', error);

@@ -50,7 +50,8 @@ import {
   cilPeople,
   cilSpeedometer,
   cilWarning,
-  cilLoopCircular
+  cilLoopCircular,
+  cilCloudDownload
 } from '@coreui/icons';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import {
@@ -174,6 +175,10 @@ const AttendanceList = () => {
   const [syncLoading, setSyncLoading] = useState(false);
   const [showSyncConfirm, setShowSyncConfirm] = useState(false);
   const [pendingSyncPeriod, setPendingSyncPeriod] = useState('');
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadPeriod, setDownloadPeriod] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+  const [downloadLoading, setDownloadLoading] = useState(false);
   const searchInputRef = useRef(null);
 
   const summaryMetrics = useMemo(() => {
@@ -303,6 +308,65 @@ const AttendanceList = () => {
       pageSize,
       showFilters: nextShowFilters
     });
+  };
+
+  const handleOpenDownloadModal = () => {
+    if (downloadLoading) {
+      return;
+    }
+
+    const defaultPeriod =
+      (filters.payroll_periode || '').trim() ||
+      (appliedFilters.payroll_periode || '').trim() ||
+      new Date().toISOString().slice(0, 7).replace('-', '');
+
+    setDownloadPeriod(payrollPeriodToPickerValue(defaultPeriod));
+    setDownloadError('');
+    setShowDownloadModal(true);
+  };
+
+  const handleCloseDownloadModal = () => {
+    if (downloadLoading) {
+      return;
+    }
+
+    setShowDownloadModal(false);
+    setDownloadError('');
+  };
+
+  const handleDownloadSubmit = async (event) => {
+    event.preventDefault();
+    if (downloadLoading) {
+      return;
+    }
+
+    const normalizedPeriod = pickerValueToPayrollPeriod(downloadPeriod);
+    if (!normalizedPeriod) {
+      setDownloadError('Please select a payroll period.');
+      return;
+    }
+
+    try {
+      setDownloadLoading(true);
+      setDownloadError('');
+
+      const response = await attendanceService.downloadAttendance(normalizedPeriod);
+      const payload = response?.data || response;
+      const fileUrl = payload?.download_url;
+
+      if (!fileUrl) {
+        throw new Error(payload?.message || 'No download URL returned.');
+      }
+
+      await attendanceService.triggerAttendanceDownload(fileUrl);
+      setShowDownloadModal(false);
+      setSuccessMessage('Attendance report downloaded successfully.');
+    } catch (error) {
+      console.error('Error downloading attendance report:', error);
+      setDownloadError(error?.message || 'Failed to download attendance report.');
+    } finally {
+      setDownloadLoading(false);
+    }
   };
 
   const handleOpenSyncModal = () => {
@@ -943,6 +1007,10 @@ const AttendanceList = () => {
                 </p>
               </div>
               <div className="d-flex flex-wrap gap-2 justify-content-lg-end">
+                <CButton color="primary" variant="outline" onClick={handleOpenDownloadModal}>
+                  <CIcon icon={cilCloudDownload} className="me-1" />
+                  Download
+                </CButton>
                 <CButton color="primary" onClick={handleOpenAddModal}>
                   <CIcon icon={cilPlus} className="me-1" />
                   Add Attendance
@@ -1286,6 +1354,47 @@ const AttendanceList = () => {
                 </CButton>
               </div>
             )}
+          <CModal visible={showDownloadModal} onClose={handleCloseDownloadModal} backdrop="static">
+            <CForm onSubmit={handleDownloadSubmit}>
+              <CModalHeader>
+                <CModalTitle>Download Attendance</CModalTitle>
+              </CModalHeader>
+              <CModalBody>
+                {downloadError && (
+                  <CAlert color="danger" className="mb-3">
+                    {downloadError}
+                  </CAlert>
+                )}
+                <div className="mb-3">
+                  <CFormLabel htmlFor="attendance-download-period">Payroll Period</CFormLabel>
+                  <CFormInput
+                    id="attendance-download-period"
+                    type="month"
+                    value={downloadPeriod}
+                    onChange={(e) => setDownloadPeriod(e.target.value)}
+                    disabled={downloadLoading}
+                    autoComplete="off"
+                  />
+                </div>
+              </CModalBody>
+              <CModalFooter>
+                <CButton color="secondary" variant="outline" onClick={handleCloseDownloadModal} disabled={downloadLoading}>
+                  Cancel
+                </CButton>
+                <CButton color="primary" type="submit" disabled={downloadLoading}>
+                  {downloadLoading ? (
+                    <>
+                      <CSpinner size="sm" className="me-2" />
+                      Downloading...
+                    </>
+                  ) : (
+                    'Download'
+                  )}
+                </CButton>
+              </CModalFooter>
+            </CForm>
+          </CModal>
+
           <CModal visible={showSyncModal} onClose={handleCloseSyncModal} backdrop="static">
             <CForm onSubmit={handleSyncSubmit}>
               <CModalHeader>

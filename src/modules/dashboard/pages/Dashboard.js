@@ -48,12 +48,12 @@ import {
 } from '../../../utils/formatters';
 import { readSessionFilter, writeSessionFilter } from '../../../utils/filterPersistence';
 import { PERMISSIONS } from '../../../constants/userRoles';
-import apiClient from '../../../utils/apiClient';
-import { API_ENDPOINTS } from '../../../constants/apiEndpoints';
 import { useDocumentTitle } from '../../../utils/documentTitle';
 import config from '../../../config/environment';
 import companyService from '../../companies/services/companyService';
 import payrollService from '../../payroll/services/payrollService';
+import dashboardService from '../services/dashboardService';
+import CompanyPeriodSummaryTable from '../components/CompanyPeriodSummaryTable';
 
 const formatPeriodLabel = (period, fallbackLabel) => {
   if (!period) {
@@ -123,6 +123,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [overview, setOverview] = useState(null);
+  const [companyPeriodSummary, setCompanyPeriodSummary] = useState(null);
+  const [companyPeriodSummaryLoading, setCompanyPeriodSummaryLoading] = useState(true);
+  const [companyPeriodSummaryError, setCompanyPeriodSummaryError] = useState('');
   const [activeFilters, setActiveFilters] = useState(() => readDashboardFilters());
   const [filterForm, setFilterForm] = useState(() =>
     createFilterFormFromActiveFilters(readDashboardFilters())
@@ -148,23 +151,7 @@ const Dashboard = () => {
       setLoading(true);
       setError('');
 
-      const params = new URLSearchParams();
-      if (activeFilters.companyId) {
-        params.append('company_id', activeFilters.companyId);
-      }
-      if (activeFilters.periodStart) {
-        params.append('period_start', activeFilters.periodStart);
-      }
-      if (activeFilters.periodEnd) {
-        params.append('period_end', activeFilters.periodEnd);
-      }
-
-      const queryString = params.toString();
-      const url = queryString
-        ? `${API_ENDPOINTS.DASHBOARD.OVERVIEW}?${queryString}`
-        : API_ENDPOINTS.DASHBOARD.OVERVIEW;
-
-      const response = await apiClient.get(url);
+      const response = await dashboardService.getOverview(activeFilters);
 
       if (response?.status) {
         setOverview(response.data);
@@ -180,9 +167,30 @@ const Dashboard = () => {
     }
   }, [activeFilters]);
 
+  const loadCompanyPeriodSummary = useCallback(async () => {
+    try {
+      setCompanyPeriodSummaryLoading(true);
+      setCompanyPeriodSummaryError('');
+      const response = await dashboardService.getCompanyPeriodSummary(activeFilters);
+
+      if (response?.status) {
+        setCompanyPeriodSummary(response.data);
+      } else {
+        throw new Error(response?.message || 'Gagal memuat ringkasan perusahaan.');
+      }
+    } catch (err) {
+      console.error('Error loading company period summary:', err);
+      setCompanyPeriodSummary(null);
+      setCompanyPeriodSummaryError(err.message || 'Gagal memuat ringkasan perusahaan.');
+    } finally {
+      setCompanyPeriodSummaryLoading(false);
+    }
+  }, [activeFilters]);
+
   useEffect(() => {
     loadOverviewData();
-  }, [loadOverviewData]);
+    loadCompanyPeriodSummary();
+  }, [loadOverviewData, loadCompanyPeriodSummary]);
 
   useEffect(() => {
     const fetchCompanyOptions = async () => {
@@ -674,6 +682,12 @@ const Dashboard = () => {
                       <strong>{periodRangeLabel}</strong>
                     </div>
                   </div>
+                  <CompanyPeriodSummaryTable
+                    periods={companyPeriodSummary?.periods}
+                    companies={companyPeriodSummary?.companies}
+                    loading={companyPeriodSummaryLoading}
+                    error={companyPeriodSummaryError}
+                  />
                 </CCardBody>
               </CCard>
             </CCol>

@@ -104,7 +104,8 @@ export const API_ENDPOINTS = {
 
   // Dashboard Endpoints
   DASHBOARD: {
-    OVERVIEW: `${API_BASE}/dashboard/overview`
+    OVERVIEW: `${API_BASE}/dashboard/overview`,
+    COMPANY_PERIOD_SUMMARY: `${API_BASE}/dashboard/company-period-summary`
   },
 
   // Attendance Management Endpoints
@@ -113,7 +114,9 @@ export const API_ENDPOINTS = {
     CREATE: `${API_BASE}/attendance/store`,
     UPDATE: `${API_BASE}/attendance/update`,
     DELETE: (id) => `${API_BASE}/attendance/delete/${id}`,
-    SYNC_EXTERNAL: `${API_BASE}/attendance/sync-external`
+    SYNC_EXTERNAL: `${API_BASE}/attendance/sync-external`,
+    DOWNLOAD: (periode) => `${API_BASE}/attendance/download/${periode}`,
+    DOWNLOAD_FILE: `${API_BASE}/attendance/download/file`
   },
 
   // External API Endpoints

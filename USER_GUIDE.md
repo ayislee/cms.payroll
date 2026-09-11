@@ -171,6 +171,7 @@ Saat sync:
 
 - Employee baru akan dibuat.
 - Employee existing akan diperbarui.
+- Job Position tidak diperbarui dari sistem eksternal. Field tersebut dikelola manual pada employee payroll.
 - Employee baru akan mendapatkan default payroll component dan default company benefit assignment.
 - Company benefit assignment default adalah inactive sampai diaktifkan di tab `Benefit`.
 

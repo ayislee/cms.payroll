@@ -119,16 +119,16 @@ const PayrollDetail = () => {
     if (checked && emailed) {
       return (
         <>
-          <CBadge color="success" className="me-1">Checked</CBadge>
+          <CBadge color="success" className="me-1">Approved</CBadge>
           <CBadge color="success">Emailed</CBadge>
         </>
       );
     } else if (checked) {
-      return <CBadge color="success">Checked</CBadge>;
+      return <CBadge color="success">Approved</CBadge>;
     } else if (emailed) {
       return <CBadge color="success">Emailed</CBadge>;
     } else {
-      return <CBadge color="secondary">Needs Check</CBadge>;
+      return <CBadge color="secondary">Pending</CBadge>;
     }
   };
 
@@ -354,11 +354,11 @@ const PayrollDetail = () => {
 
     const companyFromEmployee = payrollData.employee?.company;
     if (companyFromEmployee && typeof companyFromEmployee === 'object') {
-      return companyFromEmployee.name || `Company #${companyFromEmployee.company_id}`;
+      return companyFromEmployee.name || payrollData.company_name || `Company #${companyFromEmployee.company_id}`;
     }
 
     if (payrollData.company && typeof payrollData.company === 'object') {
-      return payrollData.company.name || `Company #${payrollData.company.company_id}`;
+      return payrollData.company.name || payrollData.company_name || `Company #${payrollData.company.company_id}`;
     }
 
     if (payrollData.company_name) {

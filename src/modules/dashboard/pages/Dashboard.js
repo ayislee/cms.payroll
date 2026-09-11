@@ -733,7 +733,7 @@ const Dashboard = () => {
                     className="mb-4 shadow-sm border-0"
                     color="success"
                     value={formatCurrency(payrollMetrics.checked_net_pay ?? payrollMetrics.total_net_pay, { maximumFractionDigits: 0 })}
-                    title="Total Net Pay Checked"
+                    title="Total Net Pay Approved"
                     action={<CIcon icon={cilCash} height={48} className="text-white-50" />}
                   />
                 </CCol>
@@ -742,7 +742,7 @@ const Dashboard = () => {
                     className="mb-4 shadow-sm border-0"
                     color="warning"
                     value={formatCurrency(payrollMetrics.unchecked_net_pay, { maximumFractionDigits: 0 })}
-                    title="Total Net Pay Belum Check"
+                    title="Total Net Pay Pending"
                     action={<CIcon icon={cilWarning} height={48} className="text-white-50" />}
                   />
                 </CCol>
@@ -763,7 +763,7 @@ const Dashboard = () => {
                     className="mb-4 shadow-sm border-0"
                     color="success"
                     value={toLocaleNumber(payrollMetrics.checked_records)}
-                    title="Total Payroll Checked"
+                    title="Total Payroll Approved"
                     action={<CIcon icon={cilCheckCircle} height={48} className="text-white-50" />}
                   />
                 </CCol>
@@ -772,7 +772,7 @@ const Dashboard = () => {
                     className="mb-4 shadow-sm border-0"
                     color="warning"
                     value={toLocaleNumber(payrollMetrics.unchecked_records)}
-                    title="Total Payroll Belum Check"
+                    title="Total Payroll Pending"
                     action={<CIcon icon={cilWarning} height={48} className="text-white-50" />}
                   />
                 </CCol>

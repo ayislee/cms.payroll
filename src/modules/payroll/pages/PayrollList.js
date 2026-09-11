@@ -1283,7 +1283,7 @@ const PayrollList = () => {
                     disabled={selectedEligiblePayrolls.length === 0}
                   >
                     <CIcon icon={cilCheckCircle} className="me-1" />
-                    Check Selected ({selectedEligiblePayrolls.length})
+                    Approve Selected ({selectedEligiblePayrolls.length})
                   </CButton>
                   <CButton
                     color="warning"
@@ -1343,14 +1343,14 @@ const PayrollList = () => {
                         <CIcon icon={cilCheckCircle} className="text-info" />
                       </div>
                       <div>
-                        <div className="text-uppercase text-medium-emphasis small">Manual Check</div>
+                        <div className="text-uppercase text-medium-emphasis small">Manual Approved</div>
                         <div className="fs-5 fw-semibold">
-                          {summaryMetrics.printedCount.toLocaleString('id-ID')} checked
+                          {summaryMetrics.printedCount.toLocaleString('id-ID')} approved
                         </div>
                       </div>
                     </div>
                     <div className="small text-medium-emphasis">
-                      {summaryMetrics.printedCount.toLocaleString('id-ID')} of {payrolls.length.toLocaleString('id-ID')} payrolls have been manually checked.
+                      {summaryMetrics.printedCount.toLocaleString('id-ID')} of {payrolls.length.toLocaleString('id-ID')} payrolls have been manually approved.
                     </div>
                   </div>
                 </CCol>
@@ -1522,7 +1522,7 @@ const PayrollList = () => {
                             <CTableDataCell>
                               <div className="d-flex flex-wrap gap-2">
                                 <CBadge color={payroll.is_printed ? 'success' : 'warning'}>
-                                  {payroll.is_printed ? 'Checked' : 'Needs check'}
+                                  {payroll.is_printed ? 'Approved' : 'Pending'}
                                 </CBadge>
                                 <CBadge color={hasSlipFile ? 'info' : 'secondary'}>
                                   {hasSlipFile ? 'File available' : 'No file'}
@@ -1585,7 +1585,7 @@ const PayrollList = () => {
                                         ? 'Emailed payroll cannot be reopened'
                                         : 'Reopen payroll for correction')
                                       : hasSlipFile
-                                        ? 'Mark payroll as checked'
+                                        ? 'Mark payroll as Approved'
                                         : 'Payroll slip is not available'
                                   }
                                   disabled={

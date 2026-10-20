@@ -173,7 +173,7 @@ const EmployeeForm = () => {
             job_position: employee.job_position || '',
             grade: employee.grade || '',
             organization: employee.organization || '',
-            resign_date: employee.resign_date || '',
+            resign_date: employee.resign_date ? String(employee.resign_date).slice(0, 10) : '',
             rekening: employee.rekening || '',
             bank: employee.bank || '',
             cabang: employee.cabang || '',

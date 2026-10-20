@@ -41,6 +41,7 @@ export const API_ENDPOINTS = {
   // Employee Component Endpoints
   EMPLOYEE_COMPONENTS: {
     LIST: (employeeId) => `${API_BASE}/payroll/employee/setting?employee_id=${employeeId}`,
+    REGENERATE: `${API_BASE}/payroll/employee/regenerate`,
     UPDATE: `${API_BASE}/payroll/employee/update`,
     TOGGLE_ACTIVE: `${API_BASE}/payroll/employee/toggle-active`,
     DETAIL: (id) => `${API_BASE}/payroll/employee/get?employee_component_id=${id}`

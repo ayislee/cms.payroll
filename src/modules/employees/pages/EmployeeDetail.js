@@ -55,7 +55,8 @@ import {
   cilBank,
   cilNotes,
   cilDollar,
-  cilSave
+  cilSave,
+  cilReload
 } from '@coreui/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
@@ -131,6 +132,8 @@ const EmployeeDetail = () => {
   const [editingComponent, setEditingComponent] = useState(null);
   const [componentForm, setComponentForm] = useState({ amount: 0, is_active: true });
   const [componentStatusUpdatingId, setComponentStatusUpdatingId] = useState(null);
+  const [regeneratingComponents, setRegeneratingComponents] = useState(false);
+  const [componentsNotice, setComponentsNotice] = useState('');
   const [benefitUpdatingId, setBenefitUpdatingId] = useState(null);
 
   // Debugging: Log when component mounts
@@ -402,6 +405,28 @@ const EmployeeDetail = () => {
     } catch (error) {
       console.error('Error updating employee component:', error);
       setComponentsError(error.message || 'Failed to update employee component');
+    }
+  };
+
+  const handleRegenerateComponents = async () => {
+    if (!employee?.employee_id || !hasPermission(PERMISSIONS.EMPLOYEES_UPDATE)) {
+      return;
+    }
+
+    try {
+      setRegeneratingComponents(true);
+      setComponentsError('');
+      setComponentsNotice('');
+
+      const result = await employeeComponentService.regenerateEmployeeComponents(employee.employee_id);
+      const components = await employeeComponentService.getEmployeeComponents(employee.employee_id);
+      setEmployeeComponents(sortEmployeeComponents(components || []));
+      setComponentsNotice(result?.message || 'Employee components regenerated successfully.');
+    } catch (error) {
+      console.error('Error regenerating employee components:', error);
+      setComponentsError(error.message || 'Failed to regenerate employee components');
+    } finally {
+      setRegeneratingComponents(false);
     }
   };
 
@@ -1070,17 +1095,39 @@ const EmployeeDetail = () => {
                               </CCol>
                               {hasPermission(PERMISSIONS.EMPLOYEES_UPDATE) && (
                                 <CCol xs="auto">
-                                  <Link to={`/employees/${id}/edit`}>
-                                    <CButton color="warning" size="sm">
-                                      <CIcon icon={cilPencil} className="me-1" />
-                                      Edit Employee
+                                  <div className="d-flex gap-2">
+                                    <CButton
+                                      color="primary"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleRegenerateComponents}
+                                      disabled={regeneratingComponents}
+                                      title="Generate missing active payroll components without changing existing components"
+                                    >
+                                      {regeneratingComponents ? (
+                                        <CSpinner size="sm" className="me-1" />
+                                      ) : (
+                                        <CIcon icon={cilReload} className="me-1" />
+                                      )}
+                                      Regenerate Components
                                     </CButton>
-                                  </Link>
+                                    <Link to={`/employees/${id}/edit`}>
+                                      <CButton color="warning" size="sm">
+                                        <CIcon icon={cilPencil} className="me-1" />
+                                        Edit Employee
+                                      </CButton>
+                                    </Link>
+                                  </div>
                                 </CCol>
                               )}
                             </CRow>
                           </CCardHeader>
                           <CCardBody>
+                            {componentsNotice && (
+                              <CAlert color="success" dismissible onClose={() => setComponentsNotice('')}>
+                                {componentsNotice}
+                              </CAlert>
+                            )}
                             {componentsLoading ? (
                               <div className="d-flex justify-content-center align-items-center" style={{ height: '200px' }}>
                                 <CSpinner color="primary" />

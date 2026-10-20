@@ -50,6 +50,18 @@ class EmployeeComponentService {
     }
   }
 
+  async regenerateEmployeeComponents(employeeId) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.EMPLOYEE_COMPONENTS.REGENERATE, {
+        employee_id: employeeId
+      });
+      return response.data || response;
+    } catch (error) {
+      console.error('Error regenerating employee components:', error);
+      throw this.handleError(error);
+    }
+  }
+
   async toggleEmployeeComponentActive(componentId, isActive) {
     try {
       const response = await apiClient.put(API_ENDPOINTS.EMPLOYEE_COMPONENTS.TOGGLE_ACTIVE, {

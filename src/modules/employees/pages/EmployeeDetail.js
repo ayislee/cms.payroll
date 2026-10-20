@@ -452,7 +452,7 @@ const EmployeeDetail = () => {
         <div className="mt-2">
           <Link to={employeeListDestination} state={employeeListState}>
             <CButton color="primary" size="sm">
-              Back to Employee List
+              Employee List
             </CButton>
           </Link>
         </div>
@@ -467,7 +467,7 @@ const EmployeeDetail = () => {
         <div className="mt-2">
           <Link to={employeeListDestination} state={employeeListState}>
             <CButton color="primary" size="sm">
-              Back to Employee List
+              Employee List
             </CButton>
           </Link>
         </div>
@@ -641,13 +641,16 @@ const EmployeeDetail = () => {
                 </CCol>
                 <CCol xs="auto">
                   <CButtonGroup>
+                    <CButton color="secondary" variant="outline" onClick={() => navigate(-1)}>
+                      <CIcon icon={cilArrowLeft} className="me-1" />
+                      Back Page
+                    </CButton>
                     <Link to={employeeListDestination} state={employeeListState}>
                       <CButton color="secondary" variant="outline">
-                        <CIcon icon={cilArrowLeft} className="me-1" />
-                        Back to List
+                        Employee List
                       </CButton>
                     </Link>
-                    {hasPermission(PERMISSIONS.EMPLOYEES_UPDATE) && (
+                    {/* {hasPermission(PERMISSIONS.EMPLOYEES_UPDATE) && (
                       <Link to={`/employees/${id}/edit`}>
                         <CButton color="warning">
                           <CIcon icon={cilPencil} className="me-1" />
@@ -660,7 +663,7 @@ const EmployeeDetail = () => {
                         <CIcon icon={cilTrash} className="me-1" />
                         Delete
                       </CButton>
-                    )}
+                    )} */}
                   </CButtonGroup>
                 </CCol>
               </CRow>
@@ -1271,19 +1274,23 @@ const EmployeeDetail = () => {
               <CRow className="mt-4">
                 <CCol xs={12}>
                   <div className="d-flex justify-content-end gap-2">
+                    <CButton color="secondary" variant="outline" onClick={() => navigate(-1)}>
+                      <CIcon icon={cilArrowLeft} className="me-1" />
+                      Back Page
+                    </CButton>
                     <Link to={employeeListDestination} state={employeeListState}>
                       <CButton color="secondary" variant="outline">
-                        Back to Employee List
+                        Employee List
                       </CButton>
                     </Link>
-                    {hasPermission(PERMISSIONS.EMPLOYEES_UPDATE) && (
+                    {/* {hasPermission(PERMISSIONS.EMPLOYEES_UPDATE) && (
                       <Link to={`/employees/${id}/edit`}>
                         <CButton color="primary">
                           <CIcon icon={cilPencil} className="me-1" />
                           Edit Employee
                         </CButton>
                       </Link>
-                    )}
+                    )} */}
                   </div>
                 </CCol>
               </CRow>

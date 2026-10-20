@@ -2,7 +2,7 @@
 // PAYROLL LIST PAGE
 // ========================================
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CRow,
@@ -87,7 +87,13 @@ const readPayrollFilters = () =>
         ? payrollPeriod
         : fallback.payroll_periode,
       company_id: String(filters.company_id || ''),
-      pageSize: normalizePageSize(filters.pageSize, fallback.pageSize)
+      pageSize: normalizePageSize(filters.pageSize, fallback.pageSize),
+      page: Number.isSafeInteger(Number(filters.page)) && Number(filters.page) > 0
+        ? Number(filters.page)
+        : 1,
+      scrollY: Number.isFinite(Number(filters.scrollY)) && Number(filters.scrollY) > 0
+        ? Number(filters.scrollY)
+        : 0
     };
   });
 
@@ -134,10 +140,11 @@ class PayrollListErrorBoundary extends React.Component {
 
 const PayrollList = () => {
   const persistedFilters = useMemo(() => readPayrollFilters(), []);
+  const scrollRestoreRef = useRef(persistedFilters.scrollY);
   const [payrolls, setPayrolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => persistedFilters.page);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [pageSize, setPageSize] = useState(() => persistedFilters.pageSize);
@@ -304,6 +311,28 @@ const PayrollList = () => {
 
   useDocumentTitle('Payroll List');
 
+  // Keep the list context when navigating to a payroll, employee, or another
+  // page. This includes scroll position so browser Back returns to the row area.
+  useEffect(() => {
+    const saveListState = () => {
+      writeSessionFilter(PAYROLL_FILTER_STORAGE_KEY, {
+        search: searchParams.search,
+        payroll_periode: searchParams.payroll_periode,
+        company_id: searchParams.company_id,
+        pageSize,
+        page: currentPage,
+        scrollY: window.scrollY
+      });
+    };
+
+    saveListState();
+    window.addEventListener('scroll', saveListState, { passive: true });
+    return () => {
+      saveListState();
+      window.removeEventListener('scroll', saveListState);
+    };
+  }, [searchParams, pageSize, currentPage]);
+
   useEffect(() => {
     setSelectedPayrollIds((previous) =>
       previous.filter((payrollId) =>
@@ -353,6 +382,15 @@ const PayrollList = () => {
   useEffect(() => {
     loadPayrolls();
   }, [currentPage, pageSize, appliedSearchParams]);
+
+  useEffect(() => {
+    if (!hasLoadedPayrolls || !scrollRestoreRef.current) return;
+
+    const scrollY = scrollRestoreRef.current;
+    scrollRestoreRef.current = 0;
+    const restoreScroll = window.setTimeout(() => window.scrollTo({ top: scrollY }), 0);
+    return () => window.clearTimeout(restoreScroll);
+  }, [hasLoadedPayrolls, payrolls]);
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -1491,7 +1529,17 @@ const PayrollList = () => {
                               />
                             </CTableDataCell>
                             <CTableDataCell>
-                              <div className="fw-semibold">{payroll.employee?.name || 'N/A'}</div>
+                              {payroll.employee?.employee_id ? (
+                                <Link
+                                  to={`/employees/${payroll.employee.employee_id}/settings`}
+                                  className="fw-semibold text-decoration-none"
+                                  title="Open employee payroll component settings"
+                                >
+                                  {payroll.employee.name || 'N/A'}
+                                </Link>
+                              ) : (
+                                <div className="fw-semibold">N/A</div>
+                              )}
                               <div className="small text-medium-emphasis">
                                 {payroll.employee?.nik || 'No NIK'}
                               </div>

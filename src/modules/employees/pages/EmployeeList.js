@@ -175,6 +175,12 @@ const searchStyles = `
     font-weight: 500;
   }
 
+  .employees-hero__actions .employee-sync-button:hover:not(:disabled) {
+    background-color: #fff;
+    border-color: #fff;
+    color: #3b82f6 !important;
+  }
+
   .employees-hero__actions .last-updated-indicator {
     color: rgba(255, 255, 255, 0.85);
   }
@@ -1151,7 +1157,7 @@ const EmployeeList = () => {
             <CButton
               color="light"
               variant="outline"
-              className="fw-semibold text-primary"
+              className="employee-sync-button fw-semibold text-white"
               onClick={handleOpenSyncModal}
               disabled={syncing}
             >

@@ -60,12 +60,32 @@ import {
 } from '@coreui/icons';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDocumentTitle } from '../../../utils/documentTitle';
-import { formatDate, formatDateTime, formatPhoneNumber } from '../../../utils/formatters';
+import {
+  formatDate,
+  formatDateTime,
+  formatPhoneNumber,
+  getCurrentPayrollPickerValue,
+  pickerValueToPayrollPeriod,
+  payrollPeriodToPickerValue
+} from '../../../utils/formatters';
 import { PERMISSIONS } from '../../../constants/userRoles';
 import { CALCULATION_TYPES } from '../../../constants/payrollConstants';
 import employeeService from '../services/employeeService';
 import employeeComponentService from '../services/employeeComponentService';
 import employeeBenefitService from '../services/employeeBenefitService';
+import payrollService from '../../payroll/services/payrollService';
+
+const PAYROLL_FILTER_STORAGE_KEY = 'cms.payroll.filters.payroll';
+
+const getDefaultEmployeePayrollPeriod = () => {
+  try {
+    const savedState = JSON.parse(window.sessionStorage.getItem(PAYROLL_FILTER_STORAGE_KEY) || '{}');
+    const savedPeriod = payrollPeriodToPickerValue(String(savedState.payroll_periode || '').trim());
+    return savedPeriod || getCurrentPayrollPickerValue();
+  } catch {
+    return getCurrentPayrollPickerValue();
+  }
+};
 
 const getComponentCalculationType = (component) =>
   (component.mainComponent?.calculation_type || component.calculation_type || '').toLowerCase();
@@ -134,6 +154,11 @@ const EmployeeDetail = () => {
   const [componentStatusUpdatingId, setComponentStatusUpdatingId] = useState(null);
   const [regeneratingComponents, setRegeneratingComponents] = useState(false);
   const [componentsNotice, setComponentsNotice] = useState('');
+  const [showGeneratePayrollModal, setShowGeneratePayrollModal] = useState(false);
+  const [employeePayrollPeriod, setEmployeePayrollPeriod] = useState(() => getDefaultEmployeePayrollPeriod());
+  const [generatingEmployeePayroll, setGeneratingEmployeePayroll] = useState(false);
+  const [employeePayrollError, setEmployeePayrollError] = useState('');
+  const [employeePayrollResult, setEmployeePayrollResult] = useState(null);
   const [benefitUpdatingId, setBenefitUpdatingId] = useState(null);
 
   // Debugging: Log when component mounts
@@ -427,6 +452,48 @@ const EmployeeDetail = () => {
       setComponentsError(error.message || 'Failed to regenerate employee components');
     } finally {
       setRegeneratingComponents(false);
+    }
+  };
+
+  const openGenerateEmployeePayrollModal = () => {
+    setEmployeePayrollPeriod(getDefaultEmployeePayrollPeriod());
+    setEmployeePayrollError('');
+    setShowGeneratePayrollModal(true);
+  };
+
+  const closeGenerateEmployeePayrollModal = () => {
+    if (!generatingEmployeePayroll) {
+      setShowGeneratePayrollModal(false);
+      setEmployeePayrollError('');
+    }
+  };
+
+  const handleGenerateEmployeePayroll = async () => {
+    const payrollPeriod = pickerValueToPayrollPeriod(employeePayrollPeriod);
+    if (!payrollPeriod) {
+      setEmployeePayrollError('Payroll period is required.');
+      return;
+    }
+
+    try {
+      setGeneratingEmployeePayroll(true);
+      setEmployeePayrollError('');
+      const result = await payrollService.generatePayroll(
+        employee.employee_id,
+        payrollPeriod,
+        employee.company_id || employee.company?.company_id || ''
+      );
+      setShowGeneratePayrollModal(false);
+      setEmployeePayrollResult({
+        message: result?.message || 'Payroll generated successfully.',
+        payrollPeriod,
+        data: result || {}
+      });
+    } catch (error) {
+      console.error('Error generating employee payroll:', error);
+      setEmployeePayrollError(error.message || 'Failed to generate payroll.');
+    } finally {
+      setGeneratingEmployeePayroll(false);
     }
   };
 
@@ -1096,6 +1163,14 @@ const EmployeeDetail = () => {
                                   Employee Payroll Components
                                 </h5>
                               </CCol>
+                              {hasPermission(PERMISSIONS.PAYROLL_GENERATE) && (
+                                <CCol xs="auto">
+                                  <CButton color="success" size="sm" onClick={openGenerateEmployeePayrollModal}>
+                                    <CIcon icon={cilDollar} className="me-1" />
+                                    Generate Payroll
+                                  </CButton>
+                                </CCol>
+                              )}
                               {hasPermission(PERMISSIONS.EMPLOYEES_UPDATE) && (
                                 <CCol xs="auto">
                                   <div className="d-flex gap-2">
@@ -1298,6 +1373,61 @@ const EmployeeDetail = () => {
           </CCard>
         </CCol>
       </CRow>
+
+      <CModal visible={showGeneratePayrollModal} onClose={closeGenerateEmployeePayrollModal}>
+        <CModalHeader>
+          <CModalTitle>Generate Payroll</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {employeePayrollError && (
+            <CAlert color="danger" className="mb-3">{employeePayrollError}</CAlert>
+          )}
+          <div className="mb-3">
+            <label className="form-label">Employee</label>
+            <CFormInput value={`${employee.name} (${employee.nik || employee.employee_id})`} disabled readOnly />
+          </div>
+          <div className="mb-3">
+            <label className="form-label">Payroll Period</label>
+            <CFormInput
+              type="month"
+              value={employeePayrollPeriod}
+              onChange={(event) => setEmployeePayrollPeriod(event.target.value)}
+              disabled={generatingEmployeePayroll}
+            />
+            <small className="text-muted">Default follows the last period selected on the Payroll page.</small>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={closeGenerateEmployeePayrollModal} disabled={generatingEmployeePayroll}>
+            Cancel
+          </CButton>
+          <CButton color="primary" onClick={handleGenerateEmployeePayroll} disabled={generatingEmployeePayroll}>
+            {generatingEmployeePayroll ? <><CSpinner size="sm" className="me-2" />Generating...</> : 'Generate Payroll'}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      <CModal visible={Boolean(employeePayrollResult)} onClose={() => setEmployeePayrollResult(null)}>
+        <CModalHeader>
+          <CModalTitle>Payroll Generated</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <CAlert color="success">{employeePayrollResult?.message}</CAlert>
+          <dl className="row mb-0">
+            <dt className="col-sm-5">Employee</dt>
+            <dd className="col-sm-7">{employee?.name} ({employee?.nik || employee?.employee_id})</dd>
+            <dt className="col-sm-5">Payroll Period</dt>
+            <dd className="col-sm-7">{employeePayrollResult?.payrollPeriod}</dd>
+            <dt className="col-sm-5">Net Pay</dt>
+            <dd className="col-sm-7">
+              {formatCurrency(employeePayrollResult?.data?.summary?.net_pay ?? employeePayrollResult?.data?.payroll?.net_pay ?? 0)}
+            </dd>
+          </dl>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="primary" onClick={() => setEmployeePayrollResult(null)}>OK</CButton>
+        </CModalFooter>
+      </CModal>
 
       {/* Delete Confirmation Modal */}
       <CModal visible={showDeleteModal} onClose={() => setShowDeleteModal(false)}>

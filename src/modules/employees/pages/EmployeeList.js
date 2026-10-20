@@ -3,7 +3,7 @@
 // ========================================
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   CRow,
   CCol,
@@ -442,13 +442,38 @@ const readEmployeeFilters = () =>
     };
   });
 
+const readReturnTarget = (hash) => {
+  try {
+    return hash && hash.length > 1 ? decodeURIComponent(hash.slice(1)) : '';
+  } catch {
+    return '';
+  }
+};
+
+const getReturnContext = (location, target) => {
+  const context = location.state?.employeeListReturn;
+  const filters = context?.filters;
+  if (!target || String(context?.employeeId) !== target || !filters ||
+      typeof filters.search !== 'string' || typeof filters.companyId !== 'string' ||
+      !EMPLOYEE_STATUS_FILTERS.some((item) => item.id === filters.status) ||
+      !config.pagination.pageSizeOptions.includes(filters.rows) ||
+      !Number.isSafeInteger(context.page) || context.page < 1) return null;
+  return context;
+};
+
 const EmployeeList = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasPermission } = useAuth();
   
   // Set document title
   useDocumentTitle('Employee Management');
-  const persistedFiltersRef = useRef(readEmployeeFilters());
+  const targetRef = useRef(readReturnTarget(location.hash));
+  const returnContextRef = useRef(getReturnContext(location, targetRef.current));
+  const persistedFiltersRef = useRef(returnContextRef.current?.filters || readEmployeeFilters());
+  const requestIdRef = useRef(0);
+  const restorePendingRef = useRef(Boolean(targetRef.current));
+  const loadedContextRef = useRef(null);
 
   // State management
   const [employees, setEmployees] = useState([]);
@@ -466,7 +491,7 @@ const EmployeeList = () => {
   const [companyFilterError, setCompanyFilterError] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState(() => persistedFiltersRef.current.companyId);
   const [statusFilter, setStatusFilter] = useState(() => persistedFiltersRef.current.status);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => returnContextRef.current?.page || 1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [actualTotalEmployees, setActualTotalEmployees] = useState(0);
@@ -477,6 +502,8 @@ const EmployeeList = () => {
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [infoMessage, setInfoMessage] = useState('');
+  const [returnMessage, setReturnMessage] = useState('');
+  const [restoreReady, setRestoreReady] = useState(false);
   const canCreateEmployee = hasPermission(PERMISSIONS.EMPLOYEES_CREATE);
   const canUpdateEmployee = hasPermission(PERMISSIONS.EMPLOYEES_UPDATE);
   const canSyncEmployees = canCreateEmployee || canUpdateEmployee;
@@ -609,8 +636,15 @@ const EmployeeList = () => {
     showSearchIndicator = true,
     rowsOverride,
     companyId = '',
-    employeeStatus = 'active'
+    employeeStatus = 'active',
+    restoring = false
   ) => {
+    const requestId = ++requestIdRef.current;
+    if (!restoring) {
+      restorePendingRef.current = false;
+      setRestoreReady(false);
+      setReturnMessage('');
+    }
     try {
       const effectiveCompanyId = String(companyId || '').trim();
       const effectiveStatus = employeeStatus || 'active';
@@ -636,7 +670,14 @@ const EmployeeList = () => {
         params.company_id = effectiveCompanyId;
       }
 
-      const response = await employeeService.getEmployees(params);
+      let response = await employeeService.getEmployees(params);
+      if (requestId !== requestIdRef.current) return;
+      const lastPage = Math.max(1, Number(response.lastPage) || 1);
+      if (restoring && page > lastPage) {
+        response = await employeeService.getEmployees({ ...params, page: lastPage });
+        if (requestId !== requestIdRef.current) return;
+        page = lastPage;
+      }
 
       setEmployees(Array.isArray(response.data) ? response.data : []);
       setTotalEmployees(response.total ?? (Array.isArray(response.data) ? response.data.length : 0));
@@ -644,29 +685,52 @@ const EmployeeList = () => {
       const pageSize = effectiveRows || config.pagination.defaultRows;
       setTotalPages(response.lastPage || Math.ceil(totalCount / pageSize));
       setCurrentPage(response.page || page);
+      loadedContextRef.current = {
+        page: response.page || page,
+        filters: { search: search.trim(), companyId: effectiveCompanyId, status: effectiveStatus, rows: effectiveRows }
+      };
+      if (restoring && restorePendingRef.current) setRestoreReady(true);
 
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
+      restorePendingRef.current = false;
       console.error('Error loading employees:', error);
       setError(error.message || 'Failed to load employees');
       setEmployees([]);
     } finally {
-      setLoading(false);
-      setIsSearching(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        setIsSearching(false);
+      }
     }
   }, []);
 
   // Initial load
   useEffect(() => {
     const persistedFilters = persistedFiltersRef.current;
+    if (returnContextRef.current) writeSessionFilter(EMPLOYEE_FILTER_STORAGE_KEY, persistedFilters);
     loadEmployees(
-      1,
+      returnContextRef.current?.page || 1,
       persistedFilters.search,
       true,
       persistedFilters.rows,
       persistedFilters.companyId,
-      persistedFilters.status
+      persistedFilters.status,
+      Boolean(targetRef.current)
     );
   }, [loadEmployees]);
+
+  useEffect(() => {
+    if (!restoreReady || loading || !restorePendingRef.current) return;
+    restorePendingRef.current = false;
+    const row = document.getElementById(targetRef.current);
+    if (row && employees.some((employee) => String(employee.employee_id) === targetRef.current)) {
+      row.scrollIntoView({ block: 'center' });
+    } else {
+      setReturnMessage('Karyawan tidak ditemukan pada halaman atau filter saat ini. Ubah filter atau halaman untuk mencarinya.');
+    }
+    setRestoreReady(false);
+  }, [restoreReady, loading, employees]);
 
   const loadActualTotalEmployees = useCallback(async (companyId = '') => {
     try {
@@ -1173,7 +1237,11 @@ const EmployeeList = () => {
 
       <CCard className="border-0 shadow-sm">
         <CCardBody className="p-4">
-          <div className="filter-card mb-4">
+          <div className="filter-card mb-4" onChangeCapture={() => {
+            restorePendingRef.current = false;
+            setRestoreReady(false);
+            setReturnMessage('');
+          }}>
             <div className="filter-card__header">
               <div>
                 <div className="filter-card__title">Filters</div>
@@ -1425,6 +1493,11 @@ const EmployeeList = () => {
               </CButton>
             </CAlert>
           )}
+          {returnMessage && (
+            <CAlert color="warning" className="mb-4" dismissible onClose={() => setReturnMessage('')}>
+              {returnMessage}
+            </CAlert>
+          )}
 
           <div className="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
             <small className="text-medium-emphasis">{summaryText}</small>
@@ -1463,7 +1536,7 @@ const EmployeeList = () => {
             <CTableBody>
               {employees.length > 0 ? (
                 employees.map((employee) => (
-                  <CTableRow key={employee.employee_id}>
+                  <CTableRow key={employee.employee_id} id={String(employee.employee_id)}>
                     <CTableDataCell>
                       <CBadge color="primary" className="px-3 py-2 rounded-pill">
                         #{employee.employee_id}
@@ -1517,7 +1590,12 @@ const EmployeeList = () => {
                             </CButton>
                           </Link>
                         )}
-                        <Link to={`/employees/${employee.employee_id}/settings`}>
+                        <Link
+                          to={`/employees/${encodeURIComponent(employee.employee_id)}/settings`}
+                          state={loadedContextRef.current ? {
+                            employeeListReturn: { ...loadedContextRef.current, employeeId: String(employee.employee_id) }
+                          } : undefined}
+                        >
                           <CButton color="secondary" variant="outline" size="sm" title="Employee Settings">
                             <CIcon icon={cilSettings} />
                           </CButton>

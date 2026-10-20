@@ -107,6 +107,11 @@ const EmployeeDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { hasPermission } = useAuth();
+  const employeeListReturn = String(location.state?.employeeListReturn?.employeeId) === id
+    ? location.state.employeeListReturn
+    : null;
+  const employeeListDestination = id ? `/employees#${encodeURIComponent(id)}` : '/employees';
+  const employeeListState = employeeListReturn ? { employeeListReturn } : undefined;
 
   // State management
   const [employee, setEmployee] = useState(null);
@@ -420,7 +425,7 @@ const EmployeeDetail = () => {
       <CAlert color="danger">
         {error}
         <div className="mt-2">
-          <Link to="/employees">
+          <Link to={employeeListDestination} state={employeeListState}>
             <CButton color="primary" size="sm">
               Back to Employee List
             </CButton>
@@ -435,7 +440,7 @@ const EmployeeDetail = () => {
       <CAlert color="warning">
         Employee not found
         <div className="mt-2">
-          <Link to="/employees">
+          <Link to={employeeListDestination} state={employeeListState}>
             <CButton color="primary" size="sm">
               Back to Employee List
             </CButton>
@@ -611,7 +616,7 @@ const EmployeeDetail = () => {
                 </CCol>
                 <CCol xs="auto">
                   <CButtonGroup>
-                    <Link to="/employees">
+                    <Link to={employeeListDestination} state={employeeListState}>
                       <CButton color="secondary" variant="outline">
                         <CIcon icon={cilArrowLeft} className="me-1" />
                         Back to List
@@ -1219,7 +1224,7 @@ const EmployeeDetail = () => {
               <CRow className="mt-4">
                 <CCol xs={12}>
                   <div className="d-flex justify-content-end gap-2">
-                    <Link to="/employees">
+                    <Link to={employeeListDestination} state={employeeListState}>
                       <CButton color="secondary" variant="outline">
                         Back to Employee List
                       </CButton>
